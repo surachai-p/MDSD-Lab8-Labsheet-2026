@@ -53,10 +53,149 @@
 ของแต่ละคอลัมน์ และเหตุผลว่าทำไมเลือกชนิดข้อมูลนั้น
 ```
 
-บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
+**บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง**
 
-```text
-บันทึกผลลัพธ์ที่นี่
+1. ตาราง FavoriteProducts (สินค้าที่กดถูกใจ)
+```dart
+import 'package:drift/drift.dart';
+
+/// ตารางเก็บสินค้าที่ผู้ใช้กดถูกใจ (Favorites / Liked Products)
+/// ออกแบบมาเพื่อแคชข้อมูลไว้แสดงในหน้ารายการโปรดได้ทันทีแบบออฟไลน์
+class FavoriteProducts extends Table {
+  /// รหัสสินค้าจาก Backend/API (เป็นตัวเลข)
+  /// ใช้เป็น Primary Key เพื่อป้องกันการกดถูกใจซ้ำ และค้นหาได้รวดเร็วระดับ O(1)
+  IntColumn get productId => integer()();
+
+  /// ชื่อสินค้า แคชไว้แสดงผลทันทีโดยไม่ต้องยิง API
+  TextColumn get title => text().withLength(min: 1, max: 255)();
+
+  /// ราคาสินค้า ณ ตอนที่กดถูกใจ
+  /// RealColumn: เหมาะกับราคาสินค้าทั่วไปที่มีเศษสตางค์ เช่น 149.50
+  RealColumn get price => real()();
+
+  /// URL รูปภาพหลักของสินค้า สำหรับโหลดรูปแสดงใน List/Grid
+  TextColumn get imageUrl => text()();
+
+  /// เวลาที่ผู้ใช้กดถูกใจ ใช้ในการเรียงลำดับจากล่าสุดไปเก่าสุด
+  /// กำหนด default เป็นเวลาปัจจุบัน ณ ตอนที่ Insert
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+```
+2. ตาราง AiListingDrafts (ร่างประกาศขายสินค้าที่ AI แนะนำ)
+```dart
+import 'package:drift/drift.dart';
+
+/// ตารางเก็บแบบร่างประกาศขายสินค้าที่ AI แนะนำจากรูปถ่าย
+/// แก้ปัญหาระบบ State หายเมื่อปิดแอป เพื่อให้ผู้ใช้กลับมาแก้ไขหรือโพสต์ต่อได้
+class AiListingDrafts extends Table {
+  /// รหัส Draft ภายในเครื่องแบบ Auto Increment
+  IntColumn get id => integer().autoIncrement()();
+
+  /// หัวข้อประกาศที่ AI สร้างให้ หรือผู้ใช้พิมพ์ไว้ (อาจเป็น null หาก AI กำลังวิเคราะห์)
+  TextColumn get title => text().nullable()();
+
+  /// หมวดหมู่สินค้า เช่น 'อุปกรณ์การเรียน', 'อิเล็กทรอนิกส์'
+  TextColumn get category => text().nullable()();
+
+  /// คำอธิบายรายละเอียดสินค้าที่ AI สร้างให้
+  TextColumn get description => text().nullable()();
+
+  /// Path ไฟล์รูปภาพที่เก็บไว้ในเครื่องของผู้ใช้ (Local File Storage)
+  /// เช่น '/data/user/0/com.campus.marketplace/app_flutter/draft_1.jpg'
+  TextColumn get localImagePath => text()();
+
+  /// ราคาที่ AI แนะนำเบื้องต้น (ใส่หรือไม่ใส่ก็ได้)
+  RealColumn get suggestedPrice => real().nullable()();
+
+  /// เวลาที่บันทึกหรือแก้ไขล่าสุด เพื่อเรียงร่างล่าสุดขึ้นมาแสดงก่อน
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  /// เวลาที่สร้างร่างนี้ครั้งแรก
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+}
+```
+- การเชื่อมต่อฐานข้อมูล & คำสั่ง CRUD/Streams สำหรับ Flutter
+```dart
+import 'dart:io';
+import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+
+// รวมตารางทั้งสองเข้าด้วยกัน
+part 'app_database.g.dart';
+
+@DriftDatabase(tables: [FavoriteProducts, AiListingDrafts])
+class AppDatabase extends _$AppDatabase {
+  AppDatabase() : super(_openConnection());
+
+  @override
+  int get schemaVersion => 1;
+
+  // -------------------------------------------------------------
+  // Queries สำหรับ FavoriteProducts (สินค้าที่กดถูกใจ)
+  // -------------------------------------------------------------
+
+  /// ดึงรายการสินค้าที่ถูกใจ เรียงจาก "ถูกใจล่าสุด" (likedAt DESC)
+  /// ส่งออกเป็น Stream เพื่อให้อัปเดต UI ใน Flutter แบบ Reactive อัตโนมัติ
+  Stream<List<FavoriteProduct>> watchRecentFavorites() {
+    return (select(favoriteProducts)
+          ..orderBy([(t) => OrderingTerm.desc(t.likedAt)]))
+        .watch();
+  }
+
+  /// เพิ่มหรืออัปเดตเวลาที่ถูกใจ (Upsert)
+  Future<void> likeProduct(FavoriteProductsCompanion item) {
+    return into(favoriteProducts).insertOnConflictUpdate(item);
+  }
+
+  /// ยกเลิกการถูกใจ (ลบตาม productId)
+  Future<int> removeFavorite(int productId) {
+    return (delete(favoriteProducts)..where((t) => t.productId.equals(productId))).go();
+  }
+
+  /// ตรวจสอบว่าสินค้าชิ้นนี้ถูกใจไว้แล้วหรือไม่
+  Future<bool> isProductLiked(int productId) async {
+    final query = select(favoriteProducts)..where((t) => t.productId.equals(productId));
+    final result = await query.getSingleOrNull();
+    return result != null;
+  }
+
+  // -------------------------------------------------------------
+  // Queries สำหรับ AiListingDrafts (ร่างประกาศขายสินค้าจาก AI)
+  // -------------------------------------------------------------
+
+  /// ดึงร่างประกาศทั้งหมด เรียงจากร่างที่ "แก้ไขล่าสุด" (updatedAt DESC)
+  Stream<List<AiListingDraft>> watchRecentDrafts() {
+    return (select(aiListingDrafts)
+          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
+        .watch();
+  }
+
+  /// บันทึกหรือสร้างร่างประกาศใหม่ (อัปเดต updatedAt เสมอ)
+  Future<int> saveOrUpdateDraft(AiListingDraftsCompanion draft) {
+    final withUpdatedTime = draft.copyWith(
+      updatedAt: Value(DateTime.now()),
+    );
+    return into(aiListingDrafts).insertOnConflictUpdate(withUpdatedTime);
+  }
+
+  /// ลบร่างประกาศเมื่อโพสต์ขายสำเร็จ หรือเมื่อผู้ใช้กดทิ้งร่าง
+  Future<int> deleteDraft(int draftId) {
+    return (delete(aiListingDrafts)..where((t) => t.id.equals(draftId))).go();
+  }
+}
+
+LazyDatabase _openConnection() {
+  return LazyDatabase(() async {
+    final dbFolder = await getApplicationDocumentsDirectory();
+    final file = File(p.join(dbFolder.path, 'campus_marketplace.sqlite'));
+    return NativeDatabase.createInBackground(file);
+  });
+}
 ```
 
 
@@ -70,10 +209,19 @@
 - Gemini กำหนดให้คอลัมน์ที่อ้างอิงสินค้า (`itemId`) ห้ามมีค่าซ้ำกัน (`.unique()`) หรือไม่ ถ้าไม่ได้กำหนด ให้เพิ่มเอง เพราะถ้าไม่มีข้อบังคับนี้ ผู้ใช้กดหัวใจสินค้าชิ้นเดียวกันซ้ำได้ไม่จำกัด ทำให้ตาราง Favorites มีแถวซ้ำกันสะสมไปเรื่อย ๆ
 
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
+ 
+### ขั้นตอนที่ 1.2 ตรวจสอบและเทียบกับหลักการในบทเรียน
+เมื่อเปรียบเทียบ Schema ที่ได้จาก Google AI Studio กับหลักการในบทเรียนหัวข้อ 8.3 สามารถสรุปได้ดังนี้
+- **Primary Key:** ตาราง `AiListingDrafts` กำหนด `id` เป็น Auto-increment Integer ซึ่งตรงกับหลักการในบทเรียน แต่ตาราง `FavoriteProducts` ใช้ `productId` เป็น Primary Key โดยตรง จึงควรปรับให้มี `id` เป็น Auto-increment Integer แยกต่างหาก
+- **ชนิดข้อมูลของราคา:** Gemini กำหนด `price` เป็น `RealColumn` โดยใช้ `real()` ซึ่งตรงกับหลักการในบทเรียน เนื่องจากราคาสินค้าเป็นตัวเลขที่มีทศนิยมและสามารถใช้งานเป็น `double` ใน Dart ได้
+- **การเก็บข้อมูล Favorites:** Gemini เก็บสำเนาข้อมูลสินค้า เช่น `title`, `price` และ `imageUrl` ไว้ในฐานข้อมูล ไม่ได้เก็บเพียง `itemId` แล้วเรียก API ใหม่ทุกครั้ง ซึ่งเหมาะกับหลักการ Offline-first เพราะเมื่อไม่มีอินเทอร์เน็ต แอปยังสามารถนำข้อมูลที่เก็บไว้ในเครื่องมาแสดงได้
+- **การป้องกันข้อมูลซ้ำ:** Gemini กำหนด `productId` เป็น Primary Key จึงทำให้ค่าซ้ำไม่ได้อยู่แล้ว แต่หากปรับตามบทเรียนโดยใช้ `id` เป็น Primary Key แบบ Auto-increment ก็ควรกำหนด `itemId` เป็น `.unique()` เพื่อป้องกันสินค้าชิ้นเดียวกันถูกเพิ่มใน Favorites ซ้ำหลายแถว <br>
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+**สรุป** Schema ที่ Gemini สร้างมาส่วนใหญ่ตรงกับหลักการในบทเรียน แต่ควรปรับตาราง Favorites ให้ใช้ `id` แบบ Auto-increment เป็น Primary Key และกำหนด `itemId` เป็น Unique เพื่อให้โครงสร้างตรงกับที่ออกแบบไว้ในบทเรียน
+
+ - ภาพหน้าจอผลลัพธ์จาก Gemini <br>
+ <img width="1470" height="922" alt="image" src="https://github.com/user-attachments/assets/48107776-54ec-43ef-8330-d8a661d6e8b9" />
+
 
 ---
 
@@ -171,9 +319,12 @@ dart run build_runner build --delete-conflicting-outputs
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+- หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2
+<img width="1470" height="922" alt="image" src="https://github.com/user-attachments/assets/e68c6bb7-f6b4-455b-9536-e0f5813993cf" />
+
+- เปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3
+<img width="1470" height="922" alt="image" src="https://github.com/user-attachments/assets/b3397938-f285-4f65-9afc-aca56d6aeefb" />
+
 
 ---
 
@@ -298,9 +449,17 @@ items: const [
 
 > ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ: (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+- (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home
+<img width="1206" height="2622" alt="Screenshot iPhone 17 04-10-2569 BE at 23 29 57" src="https://github.com/user-attachments/assets/9b98a87a-a38b-4a01-93b7-23d67d83e0d3" />
+
+- (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น
+<img width="1206" height="2622" alt="Screenshot iPhone 17 04-10-2569 BE at 23 30 03" src="https://github.com/user-attachments/assets/466e4995-579c-4ae4-8a62-be8091d421f9" />
+
+- (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่
+<img width="1206" height="2622" alt="Screenshot iPhone 17 04-10-2569 BE at 23 30 03" src="media/Screen Recording iPhone 17 04-10-2569 BE at 23.23.49.gif" />
+
+- (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
+<img width="1206" height="2622" alt="Screenshot iPhone 17 04-10-2569 BE at 23 30 03" src="media/Screen Recording iPhone 17 05-10-2569 BE at 00.33.24.gif" />
 
 ---
 
@@ -348,9 +507,19 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว 
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย"
+<img width="1206" height="2622" alt="Screenshot iPhone 17 05-10-2569 BE at 00 03 58" src="https://github.com/user-attachments/assets/fb987030-9cc4-410d-9467-22262b11aa98" />
+
+2. กดยืนยันร่าง
+<img width="1206" height="2622" alt="Screenshot iPhone 17 05-10-2569 BE at 00 43 26" src="https://github.com/user-attachments/assets/f9f51164-ea4d-42c6-8dd2-a82a1990a583" />
+
+
+3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน"
+<img width="1206" height="2622" alt="Screenshot iPhone 17 05-10-2569 BE at 00 43 32" src="https://github.com/user-attachments/assets/59c9ae3a-3407-4671-aa01-151d06e98c22" />
+
+
+4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง
+<img width="1206" height="2622" alt="Screenshot iPhone 17 05-10-2569 BE at 00 03 58" src="media/Screen Recording iPhone 17 05-10-2569 BE at 00.04.25.gif" />
 
 ---
 
@@ -362,9 +531,10 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 6.1** ถ่ายภาพหน้าจอที่แสดงให้เห็นว่า Tab รายการโปรดและหน้าร่างประกาศยังคงแสดงข้อมูลได้ตามปกติแม้ไม่มีอินเทอร์เน็ตเลย (ส่วน Tab หน้าหลักที่ดึงจาก Fake Store API คาดว่าจะแสดง Error ตามปกติ เพราะยังไม่ได้ทำ Local Cache ให้หน้านั้น) 
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="1206" height="2622" alt="Screenshot iPhone 17 05-10-2569 BE at 00 03 58" src="media/Screen Recording iPhone 17 05-10-2569 BE at 00.18.00.gif" />
+
+**หมายเหตุสำหรับการทดสอบบน iOS Simulator:**
+> เนื่องจาก iOS Simulator ไม่รองรับการเปิดโหมดเครื่องบิน (Airplane Mode) หรือการปิด Wi-Fi จากภายในตัวจำลองเครื่องโดยตรง การทดสอบสถานการณ์ Offline-first ในข้อนี้จึงใช้วิธี **"ปิด Wi-Fi บนเครื่อง Mac"** ชั่วคราวแทน เพื่อตัดการเชื่อมต่ออินเทอร์เน็ตของตัว Simulator
 
 ---
 
