@@ -55,9 +55,54 @@
 
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
-```text
-บันทึกผลลัพธ์ที่นี่
+ส่ง Prompt ใน Google AI Studio (Gemini 3.8 Flash) โค้ดที่ Gemini ตอบกลับมา
+
+```dart
+import 'package:drift/drift.dart';
+
+class FavoriteProducts extends Table {
+  // รหัสสินค้าจาก Backend
+  IntColumn get productId => integer()();
+
+  // ชื่อสินค้า
+  TextColumn get title => text()();
+
+  // ราคาสินค้า
+  RealColumn get price => real()();
+
+  // URL หรือ Path รูปภาพ
+  TextColumn get imageUrl => text()();
+
+  // วันและเวลาที่กดถูกใจ
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+
+  // กำหนดให้ productId เป็น Primary Key ป้องกันการกดซ้ำ
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+class ProductDrafts extends Table {
+  // Primary key รันอัตโนมัติภายในเครื่อง
+  IntColumn get id => integer().autoIncrement()();
+
+  // ชื่อประกาศ (AI แนะนำ หรือผู้ใช้แก้)
+  TextColumn get title => text().nullable()();
+
+  // หมวดหมู่สินค้า
+  TextColumn get category => text().nullable()();
+
+  // คำบรรยายสินค้า
+  TextColumn get description => text().nullable()();
+
+  // ที่อยู่ไฟล์รูปภาพในเครื่อง
+  TextColumn get localImagePath => text()();
+
+  // เวลาที่แก้ไขร่างล่าสุด
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
 ```
+
+เหตุผลที่ Gemini ให้มา (สรุป): `productId` เป็น Primary Key เพื่อกันการ Insert ซ้ำ, `price` ใช้ `RealColumn` เพราะราคามีทศนิยม, เก็บ `imageUrl` เป็นข้อความแทนการเก็บรูปทั้งไฟล์, `likedAt`/`updatedAt` ใช้ `DateTimeColumn` ไว้เรียงลำดับ และให้ `title`/`category`/`description` ของร่างเป็น `nullable()` เผื่อ AI ยังวิเคราะห์ไม่เสร็จหรือผู้ใช้ลบข้อความทิ้ง
 
 
 ### ขั้นตอนที่ 1.2: ตรวจสอบและเทียบกับหลักการในบทเรียน 🧠 คิดเอง
@@ -71,8 +116,52 @@
 
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
-```text
-บันทึกผลลัพธ์ที่นี่
+![Gemini ตอบตาราง FavoriteProducts](images/cp1_1_gemini_favorites.jpg)
+
+![Gemini ตอบตาราง ProductDrafts](images/cp1_1_gemini_drafts.jpg)
+
+**1. Primary Key ถูกต้องหรือไม่**
+
+ตารางร่างประกาศ (`ProductDrafts`) ถูกต้อง ใช้ `id` เป็น `integer().autoIncrement()` ตามบทเรียน แต่ตาราง Favorites ไม่ตรง Gemini ไม่มี `id` ของตัวเองเลย แต่เอา `productId` (id สินค้าจาก API) มาเป็น Primary Key แทนผ่าน `override primaryKey`
+
+วิธีนี้ใช้งานได้ แต่ทำให้ Primary Key ของตารางเราผูกกับข้อมูลจากภายนอก ถ้าวันหนึ่งเปลี่ยนแหล่งข้อมูล (เช่น ย้ายไป Firebase ที่ id เป็น String) ต้องแก้ Primary Key ทั้งตาราง จึงแก้ตามบทเรียน คือมี `id` เป็น Auto-increment Integer ของตารางเอง แล้วเก็บ id สินค้าแยกไว้ใน `itemId`
+
+**2. ชนิดข้อมูลของราคา**
+
+Gemini เลือก `RealColumn` (`real()`) ซึ่งตรงกับที่บทเรียนแนะนำ ใน Dart จะได้ `double` ไม่ต้องแก้ ถ้าใช้ `IntColumn` ราคาอย่าง 9.99 จะเพี้ยนเป็น 9
+
+**3. เก็บสำเนาข้อมูลหรือเก็บแค่ itemId**
+
+Gemini เสนอให้เก็บสำเนา `title`, `price`, `imageUrl` ไว้ในตารางด้วย ซึ่งถูกต้องตามหลัก Offline-first ถ้าเก็บแค่ `itemId` แล้วไปเรียก API ทุกครั้งที่เปิดหน้ารายการโปรด พอไม่มีอินเทอร์เน็ตหน้านี้จะว่างหรือ Error ทั้งที่ผู้ใช้เคยกดถูกใจไว้แล้ว การเก็บสำเนาทำให้หน้ารายการโปรดอ่านจากฐานข้อมูลในเครื่องได้ทันทีโดยไม่ต้องพึ่งเครือข่าย (ข้อเสียคือราคาอาจไม่อัปเดตถ้าร้านเปลี่ยนราคา แต่สำหรับรายการโปรดถือว่ายอมรับได้) มีข้อสังเกตคือรูปยังเป็นแค่ URL ถ้าไม่มีเน็ตตัวรูปจะโหลดไม่ขึ้น แต่ชื่อกับราคายังแสดงได้
+
+**4. `.unique()` ที่คอลัมน์อ้างอิงสินค้า**
+
+Gemini ไม่ได้ใส่ `.unique()` เพราะใช้ `productId` เป็น Primary Key ซึ่งห้ามซ้ำอยู่แล้วโดยปริยาย แต่พอเปลี่ยนมาใช้ `id` แบบ Auto-increment ตามข้อ 1 คอลัมน์ `itemId` จะไม่มีข้อบังคับเรื่องซ้ำอีกต่อไป จึงต้องเพิ่ม `integer().unique()` เอง ไม่งั้นกดหัวใจสินค้าเดิมกี่ครั้งก็ได้แถวใหม่ทุกครั้ง และตอน Insert ใช้ `InsertMode.insertOrIgnore` ให้การกดซ้ำไม่ทำอะไรแทนที่จะ Error (Gemini แนะนำ `insertOnConflictUpdate` ซึ่งจะเขียนทับแถวเดิม ไม่จำเป็นในกรณีนี้)
+
+**ข้อสังเกตเพิ่มเติม:** Gemini ให้ `title`/`category`/`description` ของร่างเป็น `nullable()` แต่ในแอปนี้ร่างจะถูกบันทึกหลังผู้ใช้กด "ยืนยันร่างประกาศ" แล้วเท่านั้น ค่าพวกนี้จึงควรมีเสมอ จึงใช้ตามบทเรียนคือไม่ nullable และให้ `title` เป็น `withLength(min: 1, max: 100)` กันชื่อประกาศว่างหรือยาวเกิน
+
+Schema ที่ใช้จริง (`lib/database/tables.dart`)
+
+```dart
+class FavoriteItems extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get itemId => integer().unique()(); // .unique() ป้องกันถูกใจสินค้าชิ้นเดียวกันซ้ำ
+  TextColumn get title => text()();
+  RealColumn get price => real()();
+  TextColumn get imageUrl => text()();
+  DateTimeColumn get addedAt => dateTime().withDefault(currentDateAndTime)();
+}
+
+// ตั้งชื่อ class ที่ generate เป็น ListingDraftRow ไม่ให้ชนกับ ListingDraft เดิมที่เก็บผลจาก AI
+@DataClassName('ListingDraftRow')
+class ListingDrafts extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get title => text().withLength(min: 1, max: 100)();
+  TextColumn get category => text()();
+  TextColumn get description => text()();
+  TextColumn get imagePath => text()();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
 ```
 
 ---
@@ -171,9 +260,80 @@ dart run build_runner build --delete-conflicting-outputs
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
 
-```text
-บันทึกผลลัพธ์ที่นี่
+![ผลการรัน build_runner](images/cp3_1_build_runner.png)
+
+สร้าง `lib/database/app_database.g.dart` สำเร็จ (wrote 50 outputs) ไม่มี Error เรื่อง Class ชื่อซ้ำ เพราะใส่ `@DataClassName('ListingDraftRow')` ไว้แล้ว
+
+`lib/database/app_database.dart`
+
+```dart
+import 'package:drift/drift.dart';
+import 'connection/connection.dart';
+import 'tables.dart';
+
+part 'app_database.g.dart';
+
+@DriftDatabase(tables: [FavoriteItems, ListingDrafts])
+class AppDatabase extends _$AppDatabase {
+  AppDatabase() : super(openConnection());
+
+  // ใช้ในเทสต์ ส่งฐานข้อมูลในหน่วยความจำเข้ามาแทนไฟล์จริง
+  AppDatabase.forTesting(super.executor);
+
+  // ถ้าแก้โครงสร้างตารางหลังจากนี้ ต้องเพิ่มเลขนี้และเขียน migration รองรับ
+  @override
+  int get schemaVersion => 1;
+}
 ```
+
+`lib/main.dart` ที่แก้แล้ว สร้าง `AppDatabase` ครั้งเดียวแล้วส่งต่อให้ Repository ทั้งสองตัว
+
+```dart
+void main() {
+  // สร้างฐานข้อมูลครั้งเดียวทั้งแอป แล้วส่งต่อให้ Repository ทุกตัวใช้ร่วมกัน
+  final db = AppDatabase();
+
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => CartModel(),
+      child: MyApp(db: db),
+    ),
+  );
+}
+
+class MyApp extends StatelessWidget {
+  final AppDatabase db;
+  const MyApp({super.key, required this.db});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Campus Marketplace',
+      debugShowCheckedModeBanner: false,
+      home: MainScaffold(
+        itemRepository: ItemRepositoryApi(),
+        favoritesRepository: FavoritesRepositoryDrift(db),
+        draftRepository: ListingDraftRepositoryDrift(db),
+      ),
+    );
+  }
+}
+```
+
+**ปัญหาที่เจอระหว่างติดตั้งและแก้ไข**
+
+1. **`--delete-conflicting-outputs` ถูกเอาออกแล้ว** — `build_runner` ที่ได้มาคือเวอร์ชัน 2.15 รันคำสั่งตามใบงานแล้วขึ้นเตือน `These options have been removed and were ignored: --delete-conflicting-outputs` แต่ยัง generate ไฟล์ได้ปกติ (เวอร์ชันใหม่จัดการไฟล์ที่ชนกันให้เองแล้ว)
+2. **`sqlite3_flutter_libs` ได้เวอร์ชัน `0.6.0+eol`** — ตอน `flutter pub add` ได้ `drift 2.35.1` ซึ่งใช้ `sqlite3` 3.x ที่รวมไลบรารี SQLite แบบ native มาให้แล้ว แพ็กเกจ `sqlite3_flutter_libs` จึงกลายเป็นแพ็กเกจเปล่า (README ของแพ็กเกจบอกว่าไม่ต้องใช้แล้วหลังอัปเกรด) ถ้าบังคับใช้ `^0.5.24` ตามใบงานจะชนกับ `sqlite3` 3.x จึงคงไว้ใน `pubspec.yaml` เป็น `^0.6.0+eol` ตามที่ใบงานให้เพิ่ม ไม่มีผลเสียอะไร
+3. **แอปนี้รันบน Flutter Web** (เหมือนสัปดาห์ที่แล้ว) แต่โค้ดเปิดฐานข้อมูลแบบในบทเรียนใช้ `File` จาก `dart:io` + `NativeDatabase` ซึ่งไม่มีบน Web จึงแยกการเปิดการเชื่อมต่อเป็น 2 ไฟล์ แล้วให้ Dart เลือกตอนคอมไพล์
+
+   ```dart
+   // lib/database/connection/connection.dart
+   export 'native.dart' if (dart.library.js_interop) 'web.dart';
+   ```
+
+   - `native.dart` ใช้โค้ดตามบทเรียน (`LazyDatabase` + `getApplicationDocumentsDirectory()` + `NativeDatabase.createInBackground`) สำหรับมือถือ/desktop
+   - `web.dart` ใช้ `WasmDatabase.open(...)` รัน SQLite ที่คอมไพล์เป็น WebAssembly ต้องวางไฟล์ `sqlite3.wasm` และ `drift_worker.js` (ดาวน์โหลดจาก release ทางการของ drift เวอร์ชัน 2.35.1 ให้ตรงกับแพ็กเกจ) ไว้ในโฟลเดอร์ `web/` ข้อมูลเก็บใน storage ของเบราว์เซอร์ ปิดแท็บแล้วเปิดใหม่ยังอยู่
+4. **Fake Store API ยังล่ม** (ตอบ `521` มาตั้งแต่สัปดาห์ที่แล้ว) หน้า Home จึงเปลี่ยน `ItemRepositoryApi` ไปใช้ DummyJSON เหมือนที่ทำในใบงานสัปดาห์ที่ 6 แก้แค่ Repository กับ `Item.fromJson` ไม่ต้องแตะ UI
 
 ---
 
@@ -298,9 +458,129 @@ items: const [
 
 > ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ: (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
 
-```text
-บันทึกผลลัพธ์ที่นี่
+ทดสอบบน Flutter Web (Chrome) การ "ปิดแอปให้สนิท" คือปิดแท็บทิ้งแล้วเปิดแท็บใหม่ ซึ่งต้องโหลดแอปและเปิดฐานข้อมูลใหม่ทั้งหมด เทียบเท่ากับ Force Stop บนมือถือ
+
+**(ก)–(ข)** กดหัวใจที่ Essence Mascara, Powder Canister และ Chanel Coco Noir จากหน้า Home แล้วสลับมา Tab "รายการโปรด" เห็นครบ 3 ชิ้น เรียงจากกดล่าสุดก่อน
+
+![รายการโปรด 3 ชิ้น](images/cp4_1_b_three_favorites.jpg)
+
+**(ค)** ปิดแท็บแล้วเปิดใหม่ กลับมาที่ Tab รายการโปรด รายการเดิมยังอยู่ครบทั้ง 3 ชิ้นในลำดับเดิม
+
+![หลังปิดเปิดแอปใหม่](images/cp4_1_c_after_reopen.jpg)
+
+กดลบ Powder Canister (ขึ้น SnackBar ยืนยัน)
+
+![ลบ 1 ชิ้น](images/cp4_1_removed_one.jpg)
+
+ปิดแท็บแล้วเปิดใหม่อีกครั้ง เหลือ 2 ชิ้น การลบถูกบันทึกถาวรเช่นกัน
+
+![หลังลบแล้วปิดเปิดใหม่](images/cp4_1_removed_after_reopen.jpg)
+
+**(ง)** กลับไปหน้า Home กดหัวใจที่ Essence Mascara (ชิ้นที่ยังอยู่ในรายการโปรด) ซ้ำอีกครั้ง แอปไม่ Error และขึ้น SnackBar ตามปกติ
+
+![กดหัวใจซ้ำ](images/cp4_1_d_favorite_again.jpg)
+
+ที่ Tab รายการโปรด Essence Mascara ยังมีแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว เพราะ `itemId` เป็น `.unique()` และ `addFavorite` ใช้ `InsertMode.insertOrIgnore`
+
+![ไม่มีแถวซ้ำ](images/cp4_1_d_no_duplicate.jpg)
+
+**โค้ดหลักที่เขียน**
+
+`lib/repositories/favorites_repository.dart`
+
+```dart
+abstract class FavoritesRepository {
+  Future<void> addFavorite(int itemId, String title, double price, String imageUrl);
+
+  /// เรียงจากสินค้าที่กดถูกใจล่าสุดก่อน
+  Future<List<FavoriteItem>> getAllFavorites();
+
+  Future<void> removeFavorite(int itemId);
+}
 ```
+
+`lib/repositories/favorites_repository_drift.dart`
+
+```dart
+class FavoritesRepositoryDrift implements FavoritesRepository {
+  final AppDatabase _db;
+
+  FavoritesRepositoryDrift(this._db);
+
+  @override
+  Future<void> addFavorite(int itemId, String title, double price, String imageUrl) async {
+    await _db.into(_db.favoriteItems).insert(
+          FavoriteItemsCompanion.insert(
+            itemId: itemId,
+            title: title,
+            price: price,
+            imageUrl: imageUrl,
+          ),
+          // itemId เป็น unique ถ้ากดหัวใจสินค้าเดิมซ้ำให้ข้ามไปเฉย ๆ แทนที่จะ error
+          mode: InsertMode.insertOrIgnore,
+        );
+  }
+
+  @override
+  Future<List<FavoriteItem>> getAllFavorites() {
+    return (_db.select(_db.favoriteItems)
+          ..orderBy([(t) => OrderingTerm.desc(t.addedAt)]))
+        .get();
+  }
+
+  @override
+  Future<void> removeFavorite(int itemId) async {
+    await (_db.delete(_db.favoriteItems)..where((t) => t.itemId.equals(itemId))).go();
+  }
+}
+```
+
+ปุ่มหัวใจใน `home_page.dart`
+
+```dart
+  Future<void> _addFavorite(Item item) async {
+    String message;
+    try {
+      await widget.favoritesRepository.addFavorite(item.id, item.title, item.price, item.imageUrl);
+      message = 'เพิ่ม "${item.title}" ในรายการโปรดแล้ว';
+    } catch (e) {
+      message = 'บันทึกรายการโปรดไม่สำเร็จ กรุณาลองใหม่';
+    }
+    // รอให้ Flutter Web render frame ก่อนแสดง SnackBar เหมือนปุ่มตะกร้า
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+  ...
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.favorite_border),
+                      tooltip: 'เพิ่มในรายการโปรด',
+                      onPressed: () => _addFavorite(item),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add_shopping_cart),
+                      onPressed: () async { /* ปุ่มตะกร้าเดิม */ },
+                    ),
+                  ],
+                ),
+```
+
+**จุดที่ต้องระวังเพิ่ม:** `MainScaffold` ใช้ `IndexedStack` ซึ่งสร้างทุก Tab ไว้ตั้งแต่เปิดแอป `initState()` ของ `FavoritesPage` จึงถูกเรียกแค่ครั้งเดียวตอนนั้น ถ้าไม่ทำอะไรเพิ่ม กดหัวใจที่หน้า Home แล้วสลับมา Tab รายการโปรดจะยังเห็นรายการเก่าจนกว่าจะปิดเปิดแอปใหม่ จึงเพิ่มเมธอด `reload()` ใน `FavoritesPage` แล้วให้ `MainScaffold` เรียกผ่าน `GlobalKey` ทุกครั้งที่ผู้ใช้กดเข้า Tab รายการโปรด
+
+```dart
+  final _favoritesKey = GlobalKey<FavoritesPageState>();
+  ...
+        onTap: (index) {
+          setState(() => _selectedIndex = index);
+          if (index == 2) _favoritesKey.currentState?.reload();
+        },
+```
+
+นอกจากนี้เขียนเทสต์ `test/repositories_test.dart` ทดสอบ Repository กับฐานข้อมูล SQLite ในหน่วยความจำ (`NativeDatabase.memory()`) ว่ากดถูกใจซ้ำแล้วยังมีแถวเดียว เรียงจากใหม่ไปเก่า และลบได้ ผ่านทั้งหมด
 
 ---
 
@@ -348,9 +628,121 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว 
 
-```text
-บันทึกผลลัพธ์ที่นี่
+ใช้รูปหูฟังเป็นสินค้าทดสอบ
+
+**1. สร้างร่างประกาศด้วย AI** เลือกรูปแล้วกด "ให้ AI ช่วยแนะนำ" Gemini ร่างชื่อประกาศ หมวดหมู่ และคำบรรยายมาให้ตรวจทาน
+
+![AI ช่วยร่างประกาศ](images/cp5_1_1_ai_draft.jpg)
+
+**2. กดยืนยันร่าง** บันทึกลงฐานข้อมูลสำเร็จ ขึ้น SnackBar "บันทึกร่างประกาศเรียบร้อยแล้ว" และฟอร์มถูกล้างพร้อมลงประกาศใหม่
+
+![ยืนยันร่างแล้ว](images/cp5_1_2_confirmed.jpg)
+
+**3. กดไอคอนประวัติที่ AppBar เข้าหน้า "ร่างประกาศของฉัน"** เห็นร่างที่เพิ่งสร้าง พร้อมหมวดหมู่และเวลาที่แก้ไขล่าสุด
+
+![ร่างประกาศของฉัน](images/cp5_1_3_my_drafts.jpg)
+
+**4. ปิดแท็บแล้วเปิดแอปใหม่** กลับเข้าหน้า "ร่างประกาศของฉัน" ร่างยังอยู่ครบ ไม่หายแม้ปิดแอป
+
+![หลังปิดเปิดแอปใหม่](images/cp5_1_4_after_reopen.jpg)
+
+**โค้ดหลักที่เขียน**
+
+`lib/repositories/listing_draft_repository.dart`
+
+```dart
+abstract class ListingDraftRepository {
+  /// ListingDraft เดิมไม่มี path รูป จึงรับ imagePath แยกเข้ามา
+  Future<void> saveDraft(ListingDraft draft, String imagePath);
+
+  /// เรียงจากร่างที่แก้ไขล่าสุดก่อน
+  Future<List<ListingDraftRow>> getAllDrafts();
+
+  Future<void> deleteDraft(int id);
+}
 ```
+
+`lib/repositories/listing_draft_repository_drift.dart`
+
+```dart
+class ListingDraftRepositoryDrift implements ListingDraftRepository {
+  final AppDatabase _db;
+
+  ListingDraftRepositoryDrift(this._db);
+
+  @override
+  Future<void> saveDraft(ListingDraft draft, String imagePath) async {
+    await _db.into(_db.listingDrafts).insert(
+          ListingDraftsCompanion.insert(
+            title: draft.title,
+            category: draft.category,
+            description: draft.description,
+            imagePath: imagePath,
+          ),
+        );
+  }
+
+  @override
+  Future<List<ListingDraftRow>> getAllDrafts() {
+    return (_db.select(_db.listingDrafts)
+          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
+        .get();
+  }
+
+  @override
+  Future<void> deleteDraft(int id) async {
+    await (_db.delete(_db.listingDrafts)..where((t) => t.id.equals(id))).go();
+  }
+}
+```
+
+ปุ่ม "ยืนยันร่างประกาศ" ใน `sell_item_page.dart` เปลี่ยนจากเก็บใน List ของ State มาบันทึกผ่าน Repository พร้อมสถานะกำลังบันทึก/สำเร็จ/ผิดพลาด
+
+```dart
+  Future<void> _confirmDraft() async {
+    final finalDraft = ListingDraft(
+      title: _titleController.text.trim(),
+      category: _categoryController.text.trim(),
+      description: _descriptionController.text.trim(),
+    );
+
+    setState(() => _isSaving = true);
+    String message;
+    try {
+      // บันทึกลง SQLite แทนการเก็บใน List ของ State ปิดแอปแล้วร่างยังอยู่
+      await widget.draftRepository.saveDraft(finalDraft, _selectedImage!.path);
+      message = 'บันทึกร่างประกาศเรียบร้อยแล้ว';
+      setState(() {
+        _selectedImage = null;
+        _imageBytes = null;
+        _draft = null;
+        _errorMessage = null;
+        _titleController.clear();
+        _categoryController.clear();
+        _descriptionController.clear();
+      });
+    } catch (e) {
+      // เช่น ชื่อประกาศว่างหรือยาวเกิน 100 ตัวอักษร ซึ่งขัดกับ withLength ของตาราง
+      message = 'บันทึกร่างไม่สำเร็จ ตรวจสอบว่าชื่อประกาศไม่ว่างและยาวไม่เกิน 100 ตัวอักษร';
+    } finally {
+      setState(() => _isSaving = false);
+    }
+
+    // รอ 100ms ให้ Flutter Web render frame ให้พร้อมก่อนแสดง SnackBar
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+```
+
+**ปัญหาที่เจอ**
+
+1. **Gemini ตอบ 402** — ครั้งแรกที่ทดสอบใช้ API Key เดิม Gemini ตอบกลับ `402 RESOURCE_EXHAUSTED: Your prepayment credits are depleted` เพราะเครดิตแบบ prepay ของโปรเจกต์นั้นหมด แอปแสดงข้อความ error ตามที่ออกแบบไว้ตั้งแต่สัปดาห์ที่ 7 (ไม่ค้าง ไม่ crash) แก้โดยสร้าง API Key ใหม่ในอีกโปรเจกต์แล้ว build ใหม่ด้วย `--dart-define=GEMINI_API_KEY=...`
+
+   ![Gemini ตอบ 402](images/cp5_1_gemini_402.jpg)
+
+2. **path รูปบน Web** — บนมือถือ `XFile.path` คือ path ของไฟล์จริงในเครื่อง แต่บน Flutter Web เป็น `blob:` URL ชั่วคราวที่ใช้ได้แค่ในแท็บนั้น ร่างจึงบันทึกได้ครบแต่ถ้าจะแสดงรูปจาก `imagePath` ภายหลังบน Web จะเปิดไม่ได้ หน้า "ร่างประกาศของฉัน" ตามโจทย์แสดงแค่ชื่อ หมวดหมู่ และเวลาแก้ไข จึงไม่กระทบ ถ้าต้องการแสดงรูปบน Web ด้วยต้องเก็บตัวรูป (bytes) แยกไว้
 
 ---
 
@@ -362,9 +754,21 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 6.1** ถ่ายภาพหน้าจอที่แสดงให้เห็นว่า Tab รายการโปรดและหน้าร่างประกาศยังคงแสดงข้อมูลได้ตามปกติแม้ไม่มีอินเทอร์เน็ตเลย (ส่วน Tab หน้าหลักที่ดึงจาก Fake Store API คาดว่าจะแสดง Error ตามปกติ เพราะยังไม่ได้ทำ Local Cache ให้หน้านั้น) 
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+ทดสอบโดย**จำลอง**การไม่มีอินเทอร์เน็ต ไม่ได้ปิด Wi-Fi ของเครื่องจริง เพราะทดสอบผ่าน Flutter Web บนเครื่องที่ใช้ทำงาน วิธีคือเปิดแอปผ่านหน้า `offline.html` (สำเนาของ `index.html` ใน `build/web` สำหรับทดสอบเท่านั้น ไม่ได้อยู่ในโค้ดของโปรเจกต์) ที่ใส่สคริปต์ให้ทุก request ที่ออกไปนอกเครื่องล้มเหลวทันทีแบบเดียวกับตอนไม่มีเน็ต (`TypeError: Failed to fetch`) ตั้งแต่ก่อนแอปเริ่มทำงาน ยกเว้นไฟล์ของแอปเองและฟอนต์ ซึ่งบนมือถือจริงก็อยู่ในเครื่องอยู่แล้ว
+
+**Tab หน้าหลัก** แสดง Error ตามที่คาดไว้ เพราะต้องดึงสินค้าจาก API และยังไม่มี Local Cache
+
+![หน้าหลักตอนไม่มีเน็ต](images/cp6_1_home_offline.jpg)
+
+**Tab รายการโปรด** ยังแสดงชื่อและราคาสินค้าครบ เพราะอ่านจากตาราง `FavoriteItems` ในเครื่อง ส่วนรูปขึ้นเป็นไอคอนแทน เพราะตารางเก็บแค่ URL ของรูป ตัวรูปยังต้องโหลดผ่านเน็ต (ตรงกับข้อสังเกตที่เขียนไว้ในส่วนที่ 1)
+
+![รายการโปรดตอนไม่มีเน็ต](images/cp6_1_favorites_offline.jpg)
+
+**หน้าร่างประกาศของฉัน** แสดงร่างได้ตามปกติ ไม่ต้องใช้เน็ตเลย
+
+![ร่างประกาศตอนไม่มีเน็ต](images/cp6_1_drafts_offline.jpg)
+
+สรุป: ข้อมูลที่ผู้ใช้สร้างเอง (รายการโปรด ร่างประกาศ) อยู่ใน SQLite ในเครื่องจึงใช้งานได้แม้ไม่มีอินเทอร์เน็ต ส่วนข้อมูลที่มาจาก Server (รายการสินค้าหน้าหลัก รูปสินค้า) ยังต้องใช้เน็ต ถ้าจะให้หน้าหลักใช้งาน Offline ได้ด้วย ต้องเพิ่มการ Cache รายการสินค้าลงฐานข้อมูลหลังโหลดสำเร็จ แล้วให้ `ItemRepository` อ่านจาก Cache เมื่อเรียก API ไม่สำเร็จ
 
 ---
 
