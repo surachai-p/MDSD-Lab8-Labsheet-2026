@@ -1,5 +1,3 @@
-# ใบงานปฏิบัติสัปดาห์ที่ 8: Local Database & Persistence ด้วย Drift
-
 **วิชา** การพัฒนาซอฟต์แวร์สำหรับอุปกรณ์เคลื่อนที่ | **เครื่องมือ** Flutter, Drift, sqlite3_flutter_libs, build_runner, Google AI Studio
 
 > 🔗 **ความต่อเนื่องของโปรเจกต์:** ใบงานนี้สืบทอดโดยตรงจากโปรเจกต์ **`campus_marketplace_w7`** ที่ทำไว้จนจบใบงานการทดลองที่ 7 ตอนนี้โปรเจกต์มี: หน้า **Home** ที่ดึงสินค้าจริงจาก Fake Store API (สัปดาห์ 6), ตะกร้าสินค้า (`CartModel`, สัปดาห์ 5), หน้า **"ลงประกาศขายสินค้า" (Sell)** ที่ใช้ Gemini Vision ช่วยแนะนำ title/category/description จากรูปภาพ (สัปดาห์ 7) และโครง **Bottom Navigation Bar** (`MainScaffold`) ที่มี 2 Tab แรกคือ "หน้าหลัก" กับ "ลงประกาศขาย"  **ยังไม่มี** ฟีเจอร์ "ถูกใจ" (Favorites) และร่างประกาศที่ AI ช่วยแนะนำ หลังกดยืนยันจะถูกเก็บไว้ใน State ชั่วคราวของ `SellItemPage` เท่านั้น **หายไปทันทีที่ปิดแอป**
@@ -55,8 +53,45 @@
 
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
-```text
-บันทึกผลลัพธ์ที่นี่
+```textimport 'package:drift/drift.dart';
+
+// -------------------------------------------------------------
+// 1. ตารางเก็บรายการสินค้าที่ถูกใจ (FavoriteProducts)
+// -------------------------------------------------------------
+class FavoriteProducts extends Table {
+  // รหัสสินค้าจากระบบหลัก (ใช้เป็น Primary Key)
+  IntColumn get productId => integer()();
+
+  // แคชข้อมูลพื้นฐานเพื่อแสดงผลแบบ Offline / Instant UI
+  TextColumn get title => text()();
+  RealColumn get price => real()();
+  TextColumn get imageUrl => text()();
+
+  // เวลาที่กดถูกใจ (ค่าเริ่มต้นเป็นเวลาปัจจุบัน)
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+// -------------------------------------------------------------
+// 2. ตารางเก็บร่างประกาศขายสินค้าจาก AI (ListingDrafts)
+// -------------------------------------------------------------
+class ListingDrafts extends Table {
+  // Primary Key แบบ Auto Increment สำหรับร่างประกาศในเครื่อง
+  IntColumn get id => integer().autoIncrement()();
+
+  // ข้อมูลที่ AI สร้างให้ (กำหนดให้ nullable เผื่อ AI ประมวลผลได้ไม่ครบ หรือผู้ใช้ลบออกเพื่อพิมพ์ใหม่)
+  TextColumn get title => text().nullable()();
+  TextColumn get category => text().nullable()();
+  TextColumn get description => text().nullable()();
+
+  // Path ของไฟล์รูปภาพในเครื่อง (เช่น Cache directory หรือ App documents)
+  TextColumn get imagePath => text()();
+
+  // เวลาแก้ไขล่าสุด เพื่อนำมาเรียงลำดับร่างที่ทำค้างไว้
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
 ```
 
 
@@ -72,8 +107,25 @@
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+จากการนำ Schema ที่ได้จาก Gemini มาตรวจสอบเทียบกับหลักการในบทเรียนหัวข้อ 8.3 สรุปผลได้ดังนี้
+
+1. การกำหนด Primary Key
+ตาราง ListingDrafts ทาง Gemini กำหนด id เป็น integer().autoIncrement() ถูกต้องตามบทเรียน แต่ในตาราง Favorites ตัว Gemini ไปใช้ productId เป็น Primary Key ตรงๆ ซึ่งไม่ตรงกับแนวทางของบทเรียนที่แนะนำให้ทำ Surrogate Key โดยใช้ id เป็น Auto-increment Integer เพื่อให้เป็นมาตรฐานเดียวกันทุกตาราง
+
+2. ชนิดข้อมูลของราคาสินค้า
+Gemini เลือกใช้ RealColumn (real()) ถูกต้องตรงตามบทเรียน เพราะเทียบเท่ากับ double ในภาษา Dart ซึ่งเหมาะกับการเก็บตัวเลขทศนิยมอย่างราคาสินค้า
+
+3. การเก็บสำเนาข้อมูลกับหลักการ Offline-first
+Gemini เสนอให้เก็บสำเนาทั้ง title, price และ imageUrl ไว้ในตาราง Favorites ครบถ้วน ซึ่งสอดคล้องกับหลักการ Offline-first ในหัวข้อ 8.6 เพราะถ้าเราเก็บแค่ itemId แล้วต้องคอยยิง API ใหม่ทุกครั้ง เวลาที่ผู้ใช้เปิดแอปตอนไม่มีอินเทอร์เน็ต หน้าแสดงรายการโปรดจะไม่สามารถดึงข้อมูลมาโชว์ได้เลย
+
+4. การป้องกันข้อมูลซ้ำ (unique)
+Gemini ไม่ได้ใช้ .unique() แต่ไปใช้การเซ็ต primaryKey บน productId แทน ซึ่งถ้าปรับตามโครงสร้างบทเรียนที่มี id เป็น Primary Key อยู่แล้ว เราจำเป็นต้องเติม .unique() เข้าไปที่ itemId เอง เพื่อป้องกันไม่ให้ผู้ใช้กดหัวใจสินค้าชิ้นเดิมแล้วข้อมูลถูกบันทึกซ้ำซ้อนลงในตาราง
+
+
 ```
+<img width="961" height="796" alt="image" src="https://github.com/user-attachments/assets/bdf6b880-6afb-4dc0-a3a6-88fe7378d14f" />
+
+<img width="940" height="752" alt="image" src="https://github.com/user-attachments/assets/766bee83-616f-4251-bc48-0f2a5ae1f2fb" />
 
 ---
 
@@ -171,9 +223,9 @@ dart run build_runner build --delete-conflicting-outputs
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="632" height="180" alt="image" src="https://github.com/user-attachments/assets/41b62f67-d461-478a-a94c-3d721d08a03c" />
+
+<img width="786" height="220" alt="image" src="https://github.com/user-attachments/assets/9258dce2-5c47-468e-a911-d93ce1b6dc70" />
 
 ---
 
@@ -298,9 +350,17 @@ items: const [
 
 > ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ: (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+ภาพ ก
+<img width="488" height="927" alt="image" src="https://github.com/user-attachments/assets/a0db55ca-a4e3-4ff0-a247-6f6c5ed36311" />
+
+ภาพ ข 
+<img width="510" height="882" alt="image" src="https://github.com/user-attachments/assets/14f297bf-70c6-4ae0-b9fd-3307a9e1b3d1" />
+
+ภาพ ค
+<img width="507" height="860" alt="image" src="https://github.com/user-attachments/assets/b9976889-9c66-4059-8deb-05d99076ec02" />
+
+ภาพ ง
+<img width="448" height="872" alt="image" src="https://github.com/user-attachments/assets/2ec18909-2dae-4f4c-b2d5-7f7a1182bf3d" />
 
 ---
 
@@ -348,9 +408,18 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว 
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+
+1. 
+<img width="441" height="862" alt="image" src="https://github.com/user-attachments/assets/a959cd00-e5d2-41e3-902d-3b39f8e62ae7" />
+
+2. 
+<img width="400" height="861" alt="image" src="https://github.com/user-attachments/assets/25ba23fc-5e8e-43ab-99a0-057dd729cdc7" />
+
+3. 
+<img width="418" height="877" alt="image" src="https://github.com/user-attachments/assets/841924b2-2b2a-4b47-b230-2dcb5f36c67d" />
+
+4.
+<img width="440" height="823" alt="image" src="https://github.com/user-attachments/assets/15eea81c-2987-46b5-b400-10cda3cfd546" />
 
 ---
 
@@ -362,9 +431,9 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 6.1** ถ่ายภาพหน้าจอที่แสดงให้เห็นว่า Tab รายการโปรดและหน้าร่างประกาศยังคงแสดงข้อมูลได้ตามปกติแม้ไม่มีอินเทอร์เน็ตเลย (ส่วน Tab หน้าหลักที่ดึงจาก Fake Store API คาดว่าจะแสดง Error ตามปกติ เพราะยังไม่ได้ทำ Local Cache ให้หน้านั้น) 
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="472" height="868" alt="image" src="https://github.com/user-attachments/assets/bc9a773d-3860-4fd7-a77c-c78766d2f425" />
+
+<img width="482" height="887" alt="image" src="https://github.com/user-attachments/assets/9963d4d2-22c5-4f45-83aa-84b7ce15ee5a" />
 
 ---
 
