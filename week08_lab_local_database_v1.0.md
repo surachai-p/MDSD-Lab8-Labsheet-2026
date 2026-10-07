@@ -56,7 +56,112 @@
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+โค้ดภาษา Dart (Drift Table):
+import 'package:drift/drift.dart';
+
+/// ตารางเก็บรายการสินค้าที่ผู้ใช้กดถูกใจ (Favorites / Wishlist)
+/// สำหรับแสดงผลออฟไลน์โดยไม่ต้องเรียก API ซ้ำ และจัดเรียงตามเวลาที่ถูกใจล่าสุดได้
+class FavoriteProducts extends Table {
+  /// 1. รหัสสินค้าจากระบบ API หลัก (ตัวเลข)
+  IntColumn get productId => integer()();
+
+  /// 2. ชื่อสินค้า
+  TextColumn get title => text().withLength(min: 1, max: 200)();
+
+  /// 3. ราคาสินค้า (บาท)
+  RealColumn get price => real()();
+
+  /// 4. URL รูปภาพสินค้าสำหรับแคชแสดงผล
+  TextColumn get imageUrl => text()();
+
+  /// 5. วันและเวลาที่กดถูกใจ
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+ตารางที่ 2: AiListingDrafts
+import 'package:drift/drift.dart';
+
+/// ตารางเก็บร่างประกาศขายสินค้าที่ AI ช่วยแนะนำจากรูปถ่าย (AI Listing Drafts)
+/// บันทึกถาวรลงเครื่อง ไม่สูญหายเมื่อปิดแอป และติดตามเวลาแก้ไขล่าสุด
+class AiListingDrafts extends Table {
+  /// 1. รหัสฉบับร่างในเครื่อง (Primary Key รันอัตโนมัติ)
+  IntColumn get id => integer().autoIncrement()();
+
+  /// 2. ชื่อประกาศขายสินค้า
+  TextColumn get title => text().withLength(min: 1, max: 150)();
+
+  /// 3. หมวดหมู่สินค้า
+  TextColumn get category => text().withLength(min: 1, max: 100)();
+
+  /// 4. คำบรรยายรายละเอียดสินค้าที่ AI แนะนำหรือผู้ใช้เพิ่มเติม
+  TextColumn get description => text()();
+
+  /// 5. Path ของไฟล์รูปภาพที่บันทึกไว้ในเครื่อง (Local Storage Path)
+  TextColumn get localImagePath => text()();
+
+  /// 6. วันและเวลาที่สร้างร่างประกาศ
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  /// 7. วันและเวลาที่แก้ไขร่างประกาศล่าสุด
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
+
+ตัวอย่างการประกอบคลาสฐานข้อมูลและ Query สำหรับใช้งานจริง
+import 'package:drift/drift.dart';
+import 'package:drift_flutter/drift_flutter.dart';
+
+part 'app_database.g.dart';
+
+@DriftDatabase(tables: [FavoriteProducts, AiListingDrafts])
+class AppDatabase extends _$AppDatabase {
+  AppDatabase() : super(_openConnection());
+
+  @override
+  int get schemaVersion => 1;
+
+  static QueryExecutor _openConnection() {
+    return driftDatabase(name: 'campus_marketplace_db');
+  }
+
+  // 1. Query รายการสินค้าที่ถูกใจ เรียงจากล่าสุดไปเก่าสุด (Stream สำหรับอัปเดต UI ทันที)
+  Stream<List<FavoriteProduct>> watchRecentFavorites() {
+    return (select(favoriteProducts)
+          ..orderBy([(t) => OrderingTerm.desc(t.likedAt)]))
+        .watch();
+  }
+
+  // 2. บันทึกหรืออัปเดตการกดถูกใจ (Insert or Update on conflict)
+  Future<void> toggleFavorite(FavoriteProduct item) {
+    return into(favoriteProducts).insertOnConflictUpdate(item);
+  }
+
+  // 3. Query รายการร่างประกาศ AI เรียงจากฉบับที่แก้ไขล่าสุด
+  Stream<List<AiListingDraft>> watchRecentDrafts() {
+    return (select(aiListingDrafts)
+          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
+        .watch();
+  }
+
+  // 4. บันทึกการแก้ไขร่างประกาศ พร้อมอัปเดตเวลา updatedAt เป็นเวลาปัจจุบัน
+  Future<bool> updateDraftContent({
+    required int draftId,
+    required String newTitle,
+    required String newDescription,
+  }) {
+    return (update(aiListingDrafts)..where((t) => t.id.equals(draftId)))
+        .write(
+          AiListingDraftsCompanion(
+            title: Value(newTitle),
+            description: Value(newDescription),
+            updatedAt: Value(DateTime.now()), // รีเฟรชเวลาแก้ไขล่าสุด
+          ),
+        )
+        .then((rows) => rows > 0);
+  }
+}
 ```
 
 
@@ -72,7 +177,17 @@
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+ข้อ 1 Primary Key ถูกต้องไหม
+บางส่วนถูก บางส่วนไม่ตรง ตาราง AiListingDrafts ใช้ id แบบ autoIncrement ซึ่งตรงกับบทเรียน แต่ตาราง FavoriteProducts Gemini ไม่ได้ใช้ id แบบ auto-increment เลย แต่เอา productId มาเป็น Primary Key แทน ซึ่งไม่ตรงกับที่บทเรียนบอกว่าควรมี id เป็น Auto-increment Integer แล้วให้ itemId เป็นคอลัมน์ Unique ต่างหาก ดังนั้นต้องแก้ตาราง Favorites ให้มี integer().autoIncrement()() เป็น id
+
+ข้อ 2 คอลัมน์ราคา
+ตรงกับบทเรียน Gemini ใช้ RealColumn (real()()) ซึ่งเป็น double ใน Dart ตรงตามบทเรียน
+
+ข้อ 3 เก็บสำเนาหรือเก็บแค่ itemId
+Gemini เลือกเก็บสำเนาไว้ในตาราง คือเก็บ title, price, imageUrl ซ้ำไว้ ซึ่งตรงกับหลัก Offline-first ในบทเรียน เพราะแอปจะแสดงรายการโปรดได้ทันทีแม้ไม่มีอินเทอร์เน็ต ถ้าเก็บแค่ itemId ต้องเรียก API ใหม่ทุกครั้ง ซึ่งพอออฟไลน์ก็จะไม่มีข้อมูลมาแสดงเลย การยอมเก็บข้อมูลซ้ำนิดหน่อยจึงคุ้มกว่า
+
+ข้อ 4 คอลัมน์อ้างอิงสินค้าห้ามซ้ำหรือไม่
+Gemini ไม่ได้กำหนด .unique() เพราะมันเอา productId ไปเป็น PK แทน ซึ่งกันซ้ำได้อยู่แล้วในทางเทคนิค แต่ไม่ตรงตามบทเรียนที่ให้ใช้ id เป็น PK แล้วตั้ง itemId เป็น Unique ต่างหาก เลยต้องแก้เองโดยเปลี่ยนชื่อเป็น itemId และเติม .unique()
 ```
 
 ---
@@ -170,10 +285,12 @@ dart run build_runner build --delete-conflicting-outputs
 > ✅ **Checkpoint 3.1**
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
+<img width="870" height="170" alt="image" src="https://github.com/user-attachments/assets/f02a911f-47b5-4197-b383-a81e365d4b8c" />
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+ขึ้นเส้นใต้สีแดงตามขั้นตอน
 ```
+<img width="810" height="807" alt="image" src="https://github.com/user-attachments/assets/37c39336-818c-4f01-8bd9-f9b6fc21fd02" />
 
 ---
 
@@ -297,10 +414,25 @@ items: const [
 > ⚠️ `IndexedStack` อ้างอิง index ตามตำแหน่งใน List `pages` และ `BottomNavigationBarItem` ต้องมีจำนวนเท่ากับ `pages` เสมอ (ตอนนี้ต้องเป็น 3 ทั้งคู่) ถ้าจำนวนไม่ตรงกันแอปจะ Error ทันทีตอนรัน ไม่ใช่แค่แสดงผลผิด
 
 > ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ: (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
+<img width="1917" height="966" alt="image" src="https://github.com/user-attachments/assets/90960994-c8c5-44a0-a1da-bc000818f769" />
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+เว็บfakestoreapi ล้มต้องเลยต้องทำหน้าร้านหลอกๆครับ 
 ```
+## (ก)
+<img width="436" height="981" alt="image" src="https://github.com/user-attachments/assets/fd3a6abe-4b33-4559-8308-72a2836f5c98" />
+
+## (ข)
+<img width="437" height="963" alt="image" src="https://github.com/user-attachments/assets/eadddbf1-b409-44fa-acee-dc2d291d1146" />
+
+## (ค)
+<img width="366" height="841" alt="image" src="https://github.com/user-attachments/assets/356d33ef-893a-460e-bf56-0e4f06f57dd6" />
+<img width="371" height="845" alt="image" src="https://github.com/user-attachments/assets/16f5f5e9-5434-4255-9d37-582d521959c4" />
+<img width="326" height="741" alt="image" src="https://github.com/user-attachments/assets/998d0b5e-a682-4e6e-a761-6d7920dfbb99" />
+
+## (ง)
+<img width="320" height="740" alt="image" src="https://github.com/user-attachments/assets/5ccd7e1b-379e-4583-bcf9-952278c3a266" />
+<img width="315" height="746" alt="image" src="https://github.com/user-attachments/assets/9271f3a5-b5ab-40b5-be37-a61f1dc47067" />
 
 ---
 
@@ -351,6 +483,17 @@ class SellItemPage extends StatefulWidget {
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+# 1
+<img width="322" height="740" alt="image" src="https://github.com/user-attachments/assets/4916abcd-a062-4a54-8f37-6d10ce0f4d6b" />
+
+# 2
+<img width="320" height="733" alt="image" src="https://github.com/user-attachments/assets/48be09f3-f1d5-4a89-9c2a-c5b14c707116" />
+
+# 3
+<img width="327" height="742" alt="image" src="https://github.com/user-attachments/assets/678074c8-4965-49be-8b41-5ed4cb5c2481" />
+
+# 4
+<img width="387" height="875" alt="image" src="https://github.com/user-attachments/assets/a6d2b24f-20ef-4baa-830d-4b334b522699" />
 
 ---
 
@@ -365,6 +508,11 @@ class SellItemPage extends StatefulWidget {
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+<img width="360" height="877" alt="Screenshot 2026-10-07 153138" src="https://github.com/user-attachments/assets/2d43f91e-050b-49aa-aa83-7958d1f0d21f" />
+<img width="371" height="803" alt="2222222 07" src="https://github.com/user-attachments/assets/37dd574f-45eb-4fd8-8937-84861674c677" />
+<img width="377" height="947" alt="Screenshot 2026-10-07 153325" src="https://github.com/user-attachments/assets/b428921d-c3f0-45e9-90c9-0c257bbfa370" />
+<img width="375" height="941" alt="Screenshot 2026-10-07 153240" src="https://github.com/user-attachments/assets/79aa9663-a5ea-45af-b586-6af34e22f8cd" />
+
 
 ---
 
