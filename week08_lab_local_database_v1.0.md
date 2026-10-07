@@ -4,7 +4,7 @@
 
 > 🔗 **ความต่อเนื่องของโปรเจกต์:** ใบงานนี้สืบทอดโดยตรงจากโปรเจกต์ **`campus_marketplace_w7`** ที่ทำไว้จนจบใบงานการทดลองที่ 7 ตอนนี้โปรเจกต์มี: หน้า **Home** ที่ดึงสินค้าจริงจาก Fake Store API (สัปดาห์ 6), ตะกร้าสินค้า (`CartModel`, สัปดาห์ 5), หน้า **"ลงประกาศขายสินค้า" (Sell)** ที่ใช้ Gemini Vision ช่วยแนะนำ title/category/description จากรูปภาพ (สัปดาห์ 7) และโครง **Bottom Navigation Bar** (`MainScaffold`) ที่มี 2 Tab แรกคือ "หน้าหลัก" กับ "ลงประกาศขาย"  **ยังไม่มี** ฟีเจอร์ "ถูกใจ" (Favorites) และร่างประกาศที่ AI ช่วยแนะนำ หลังกดยืนยันจะถูกเก็บไว้ใน State ชั่วคราวของ `SellItemPage` เท่านั้น **หายไปทันทีที่ปิดแอป**
 >
-> สัปดาห์นี้คือจุดที่ฟีเจอร์ **"รายการโปรด" (Favorites) ถูกสร้างขึ้น** พร้อมกันกับการนำร่างประกาศมาบันทึกถาวร ทั้งสองฟีเจอร์จะเข้าถึงข้อมูลผ่าน **Repository Pattern** เช่นเดียวกับที่ `ItemRepository`/`ItemRepositoryApi` ทำกับ REST API ในสัปดาห์ที่ 6 **ทำต่อในโฟลเดอร์ `campus_marketplace_w7` เดิม ห้ามสร้างโปรเจกต์ใหม่แยกต่างหาก** 
+> สัปดาห์นี้คือจุดที่ฟีเจอร์ **"รายการโปรด" (Favorites) ถูกสร้างขึ้น** พร้อมกันกับการนำร่างประกาศมาบันทึกถาวร ทั้งสองฟีเจอร์จะเข้าถึงข้อมูลผ่าน **Repository Pattern** เช่นเดียวกับที่ `ItemRepository`/`ItemRepositoryApi` ทำกับ REST API ในสัปดาห์ที่ 6 **ทำต่อในโฟลเดอร์ `campus_marketplace_w7` เดิม ห้ามสร้างโปรเจกต์ใหม่แยกต่างหาก**
 
 ---
 
@@ -56,9 +56,48 @@
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
 ```text
-บันทึกผลลัพธ์ที่นี่
-```
+import 'package:drift/drift.dart';
 
+class LikedProducts extends Table {
+  // ใช้ productId เป็น Primary Key เพราะสินค้าหนึ่งชิ้นผู้ใช้จะกดถูกใจได้เพียงครั้งเดียว
+  IntColumn get productId => integer()();
+  
+  // ชื่อสินค้า
+  TextColumn get name => text().withLength(min: 1, max: 100)();
+  
+  // ราคา (ใช้ Real สำหรับตัวเลขที่มีทศนิยม หรือใช้ Int หากเก็บเป็นหน่วยสตางค์)
+  RealColumn get price => real()();
+  
+  // URL ของรูปภาพสินค้า
+  TextColumn get imageUrl => text()();
+  
+  // เวลาที่กดถูกใจ เพื่อใช้ในการ OrderBy ตอนแสดงผล (เช่น เรียงจากล่าสุดไปเก่าสุด)
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+class DraftListings extends Table {
+  // ไอดีของร่างประกาศ (Auto Increment)
+  IntColumn get id => integer().autoIncrement()();
+  
+  // ชื่อประกาศ (อาจเป็นค่าว่างที่ AI แนะนำมาให้ก่อน)
+  TextColumn get title => text().nullable()();
+  
+  // หมวดหมู่สินค้า
+  TextColumn get category => text().nullable()();
+  
+  // คำบรรยายสินค้า (ใช้ text() รองรับข้อความยาวได้)
+  TextColumn get description => text().nullable()();
+  
+  // Path ของรูปภาพที่อยู่ในเครื่อง (เช่น /data/user/0/.../image.jpg)
+  TextColumn get localImagePath => text()();
+  
+  // เก็บเวลาที่แก้ไขล่าสุด
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
+```
 
 ### ขั้นตอนที่ 1.2: ตรวจสอบและเทียบกับหลักการในบทเรียน 🧠 คิดเอง
 
@@ -71,9 +110,20 @@
 
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="1919" height="860" alt="image" src="https://github.com/user-attachments/assets/a5dda003-3c10-4082-bff9-f71fa3fff692" />
+<img width="1919" height="884" alt="image" src="https://github.com/user-attachments/assets/8fb1f67d-a646-47ef-8ae5-3cf363eada71" />
+
+**การกำหนด Primary Key:**
+จากการตรวจสอบพบว่า Gemini กำหนด Primary Key ให้ตารางร่างประกาศ (DraftListings) ได้ถูกต้องตามหลักการ คือใช้ integer().autoIncrement()() แต่สำหรับตารางรายการโปรด (LikedProducts) Gemini เลือกใช้ productId เป็น Primary Key แทน ซึ่งตามโครงสร้างในบทเรียนแนะนำให้เราสร้างคอลัมน์ id แยกเป็น Auto-increment ต่างหาก เพื่อให้ระบบฐานข้อมูลจัดการได้ง่ายและยืดหยุ่นกว่า
+
+**ชนิดข้อมูลของราคาสินค้า:**
+Gemini เลือกใช้ RealColumn ถือว่าถูกต้องและตรงตามคำแนะนำในบทเรียนครับ เพราะราคาสินค้ามีโอกาสเป็นจุดทศนิยม การใช้ชนิดข้อมูลแบบ Real (ซึ่งเทียบเท่ากับ double ในภาษา Dart) จึงเหมาะสมกับการเก็บค่าเงินมากที่สุด
+
+**การเก็บสำเนาข้อมูล (หลักการ Offline-first):**
+Gemini ออกแบบให้เก็บสำเนาข้อมูลสำคัญ (ชื่อ, ราคา, รูปภาพ) ไว้ในตารางด้วย ซึ่งทำได้ถูกต้องตามหลักการ Offline-first ในบทที่ 8.6 ครับ เพราะถ้าหากเราเก็บเพียงแค่ itemId เมื่อใช้งานขณะไม่มีอินเทอร์เน็ต แอปจะไม่สามารถนำ ID ไปยิง API เพื่อขอข้อมูลมาแสดงผลได้ การเก็บข้อมูลสำรองไว้ใน Local Database จึงช่วยให้ผู้ใช้ดูรายการโปรดแบบออฟไลน์ได้ทันที
+
+**ข้อกำหนดการห้ามมีค่าซ้ำ (.unique):**
+Gemini ไม่ได้ใช้คำสั่ง .unique() กับคอลัมน์อ้างอิงสินค้า แต่ใช้วิธีตั้ง productId เป็น Primary Key เพื่อกันการบันทึกข้อมูลซ้ำแทน อย่างไรก็ตาม เพื่อให้โครงสร้างสอดคล้องกับใบงานและการใช้งาน InsertMode.insertOrIgnore ในขั้นตอนต่อไป จึงต้องมีการปรับแก้โค้ดเอง โดยกำหนดให้มีคอลัมน์ id เป็น Auto-increment แยกต่างหาก และใส่เงื่อนไข .unique() กำกับไว้ที่คอลัมน์ itemId เพื่อป้องกันผู้ใช้กดหัวใจซ้ำจนข้อมูลสะสมเกินความจำเป็น
 
 ---
 
@@ -99,7 +149,7 @@ dev_dependencies:
 
 ### ขั้นตอนที่ 2.2: สร้างไฟล์ประกาศตาราง 🔧 ทำตามขั้นตอน
 
-สร้างไฟล์ `lib/database/tables.dart` ตามโครงสร้างในบทเรียนหัวข้อ 8.4 (ใช้ Schema ตามบทเรียน เพื่อให้ตรงกับใบงานการทดลองในส่วนถัดไป )
+สร้างไฟล์ `lib/database/tables.dart` ตามโครงสร้างในบทเรียนหัวข้อ 8.4 (ใช้ Schema ตามบทเรียน เพื่อให้ตรงกับใบงานการทดลองในส่วนถัดไป)
 
 ```dart
 import 'package:drift/drift.dart';
@@ -124,8 +174,7 @@ class ListingDrafts extends Table {
 }
 ```
 
-⚠️ **จุดที่พลาดง่ายมากในสัปดาห์นี้โดยเฉพาะ**: ปกติ Drift จะตั้งชื่อ Class ที่ Generate จากตารางด้วยการตัด `s` ท้ายชื่อ Table ออก (เช่นตาราง `FavoriteItems` → Class `FavoriteItem` ตามที่เรียนในบทหนังสือเรียน) ถ้าปล่อยให้ `ListingDrafts` ทำแบบเดียวกัน Drift จะสร้าง Class ชื่อ `ListingDraft` ออกมา ซึ่ง**ชนกับ Class `ListingDraft` ที่สร้างไว้แล้วตั้งแต่ใบงานการทดลองที่ 7** (เก็บแค่ `title`/`category`/`description` ที่ได้จาก AI ก่อนบันทึก) ทำให้โปรเจกต์มี 2 Class ชื่อเดียวกันคนละความหมายและคอมไพล์ไม่ผ่านเพราะ import ชนกัน Annotation `@DataClassName('ListingDraftRow')` ด้านบนแก้ปัญหานี้โดยสั่งให้ Driftตั้งชื่อ Class ที่ Generate เป็น `ListingDraftRow` แทน 
-
+⚠️ **จุดที่พลาดง่ายมากในสัปดาห์นี้โดยเฉพาะ**: ปกติ Drift จะตั้งชื่อ Class ที่ Generate จากตารางด้วยการตัด `s` ท้ายชื่อ Table ออก (เช่นตาราง `FavoriteItems` → Class `FavoriteItem` ตามที่เรียนในบทหนังสือเรียน) ถ้าปล่อยให้ `ListingDrafts` ทำแบบเดียวกัน Drift จะสร้าง Class ชื่อ `ListingDraft` ออกมา ซึ่ง**ชนกับ Class `ListingDraft` ที่สร้างไว้แล้วตั้งแต่ใบงานการทดลองที่ 7** (เก็บแค่ `title`/`category`/`description` ที่ได้จาก AI ก่อนบันทึก) ทำให้โปรเจกต์มี 2 Class ชื่อเดียวกันคนละความหมายและคอมไพล์ไม่ผ่านเพราะ import ชนกัน Annotation `@DataClassName('ListingDraftRow')` ด้านบนแก้ปัญหานี้โดยสั่งให้ Drift ตั้งชื่อ Class ที่ Generate เป็น `ListingDraftRow` แทน
 
 ---
 
@@ -134,7 +183,6 @@ class ListingDrafts extends Table {
 ### ขั้นตอนที่ 3.1: สร้าง AppDatabase 🔧 ทำตามขั้นตอน
 
 ดูตัวอย่างโค้ดเต็มในบทเรียนหัวข้อ 8.4 ขั้นตอนที่ 3 แล้วคัดลอกมาสร้างไฟล์ `lib/database/app_database.dart` ของตนเอง (import ตารางจาก `tables.dart` ที่สร้างในส่วนที่ 2 เข้ามาใช้งาน พร้อม `@DriftDatabase(tables: [FavoriteItems, ListingDrafts])`) หากตั้งชื่อ Class ของตารางต่างจากตัวอย่าง ให้แก้ชื่อใน `@DriftDatabase(tables: [...])` ให้ตรงกับชื่อจริงใน `tables.dart` ของตนเองด้วย
-
 
 ### ขั้นตอนที่ 3.2: รัน Code Generation 🔧 ทำตามขั้นตอน
 
@@ -147,6 +195,7 @@ dart run build_runner build --delete-conflicting-outputs
 รอจนกระบวนการเสร็จสิ้น ตรวจสอบว่ามีไฟล์ `lib/database/app_database.g.dart` ถูกสร้างขึ้นใหม่ และตรวจสอบใน Debug Console ว่าไม่มี Error เรื่อง Class ชื่อซ้ำ (ถ้าเจอ ให้กลับไปตรวจสอบ ขั้นตอน 2.2 ว่าใส่ `@DataClassName` ไว้ถูกต้องหรือไม่)
 
 ### ขั้นตอนที่ 3.3: เชื่อม AppDatabase เข้ากับแอป 🧠 คิดเอง (มีโครงให้)
+
 **นักศึกษาเขียน Code เอง**
 
 สัปดาห์นี้ซับซ้อนกว่าเดิมเล็กน้อย เพราะ `main.dart` ต้องสร้าง `AppDatabase` ขึ้นมาหนึ่งอินสแตนซ์ แล้วส่งต่อให้ Repository **สองตัว** (Favorites และ Draft) ที่จะสร้างในส่วนที่ 4-5 ก่อนส่งเข้า `MainScaffold` อีกที ตรวจสอบตามโครงนี้แล้วเติมส่วนที่ยังไม่มี (Repository ทั้งสองตัวจะสร้างจริงในส่วนถัดไป ตอนนี้แค่เตรียมจุดเชื่อมไว้ก่อน)
@@ -171,9 +220,8 @@ dart run build_runner build --delete-conflicting-outputs
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="810" height="277" alt="image" src="https://github.com/user-attachments/assets/e35ada29-5141-4b06-a6ea-cf1e5526551d" />
+<img width="1516" height="664" alt="image" src="https://github.com/user-attachments/assets/e9c152ec-d753-43f9-8a12-7d9d6662963c" />
 
 ---
 
@@ -181,11 +229,11 @@ capture หน้าจอผลลัพธ์คำสั่ง `dart run buil
 
 นี่คือฟีเจอร์ใหม่ทั้งหมดของแอป ประกอบด้วย 4 ส่วนที่ต้องทำให้ครบ คือ 1.Repository 2.ปุ่มกดถูกใจในหน้า Home 3.หน้าจอแสดงรายการโปรด และ 4.การเพิ่ม Tab ที่ 3 เข้า Bottom Navigation Bar
 
-### ขั้นตอนที่ 4.1: สร้าง Repository Interface และ Implementation 
+### ขั้นตอนที่ 4.1: สร้าง Repository Interface และ Implementation
+
 **นักศึกษาเขียน Code เอง**
 
 สร้างไฟล์ `lib/repositories/favorites_repository.dart` (Interface) และ `lib/repositories/favorites_repository_drift.dart` (Implementation) เองทั้งหมด โดยอ้างอิงโครงสร้างและลำดับขั้นตอนจากบทเรียนหัวข้อ 8.4 (ซึ่งสอนตัวอย่างนี้ไว้แบบเต็มทุกบรรทัดอยู่แล้ว) สังเกตว่ารูปแบบนี้เหมือนกับ `ItemRepository`/`ItemRepositoryApi` ในสัปดาห์ที่ 6 ทุกประการ เพียงแค่เปลี่ยนจากการเรียก REST API มาเป็นการเรียก Drift แทน
-
 
 **ข้อกำหนดที่ต้องมีครบ (ตรวจสอบตัวเองก่อนไปต่อ):**
 
@@ -219,8 +267,10 @@ capture หน้าจอผลลัพธ์คำสั่ง `dart run buil
 - ไม่ต้องเปลี่ยนไอคอนหัวใจให้ทึบ (Toggle สถานะ) ในสัปดาห์นี้ — แค่กดแล้วเพิ่มลงฐานข้อมูลสำเร็จพร้อม SnackBar ยืนยันก็เพียงพอ (การเอาออกจากรายการโปรดทำที่หน้า Favorites โดยเฉพาะในขั้นตอนถัดไป เหมือนกับที่การลบออกจากตะกร้าทำที่หน้า Checkout ไม่ใช่หน้า Home)
 - อย่าลืมแก้จุดที่สร้าง `HomePage(...)` ใน `MainScaffold` (ขั้นตอนที่ 4.4) ให้ส่ง `favoritesRepository` เข้าไปด้วย ไม่งั้นจะ Error ว่าพารามิเตอร์ที่จำเป็นหายไป
 
-### ขั้นตอนที่ 4.3: สร้างหน้าจอ "รายการโปรด" (FavoritesPage) 
+### ขั้นตอนที่ 4.3: สร้างหน้าจอ "รายการโปรด" (FavoritesPage)
+
 **นักศึกษาเขียน Code เอง**
+
 สร้างไฟล์ `lib/screens/favorites_page.dart` เป็น `StatefulWidget` ที่รับ `FavoritesRepository` เข้ามาทาง Constructor
 
 **ข้อกำหนดที่ต้องมีครบ:**
@@ -298,15 +348,32 @@ items: const [
 
 > ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ: (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+**(ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home**
+
+<img width="360" height="828" alt="image" src="https://github.com/user-attachments/assets/7e5ba045-c00a-47a1-bc12-bdfcc2599d04" />
+
+**(ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น**
+
+<img width="356" height="824" alt="image" src="https://github.com/user-attachments/assets/a09178c5-bec8-45fa-9db2-7f2b8bd5bddb" />
+
+**(ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน**
+
+<img width="357" height="824" alt="image" src="https://github.com/user-attachments/assets/67eba788-bc86-48b4-b099-0749327e50b6" />
+<img width="355" height="822" alt="image" src="https://github.com/user-attachments/assets/1ca7fbc5-533b-424e-90d8-05eb2b0ca6d8" />
+<img width="357" height="827" alt="image" src="https://github.com/user-attachments/assets/6fc467be-9ea4-4e20-b7ed-b2bfc56934fc" />
+<img width="356" height="825" alt="image" src="https://github.com/user-attachments/assets/af777ddb-614f-402a-87b0-020b0a58277a" />
+
+**(ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error**
+
+<img width="359" height="828" alt="image" src="https://github.com/user-attachments/assets/0c855cf4-b34c-44da-bfaa-5ccc8a743674" />
+<img width="360" height="824" alt="image" src="https://github.com/user-attachments/assets/2c9d79bc-746e-4c9a-b328-5022d4585295" />
 
 ---
 
 ## ส่วนที่ 5: นำร่างประกาศขายสินค้า (สัปดาห์ที่ 7) มาบันทึกถาวร
 
-### ขั้นตอนที่ 5.1: สร้าง Repository สำหรับ Draft 
+### ขั้นตอนที่ 5.1: สร้าง Repository สำหรับ Draft
+
 **นักศึกษาเขียน Code เอง**
 
 สร้างไฟล์ `lib/repositories/listing_draft_repository.dart` (Interface) และ `lib/repositories/listing_draft_repository_drift.dart` (Implementation) ในรูปแบบเดียวกับส่วนที่ 4 ทุกประการ แต่ทำงานกับตาราง `ListingDrafts` แทน
@@ -316,7 +383,7 @@ items: const [
 - Interface `ListingDraftRepository` ต้องมีอย่างน้อย 3 เมธอด: `saveDraft(ListingDraft draft, String imagePath)` (บันทึกร่างใหม่ — รับ `ListingDraft` ที่มีอยู่แล้วจากสัปดาห์ 7 บวก path รูปภาพแยกต่างหาก เพราะ `ListingDraft` เดิมไม่มี field นี้), `getAllDrafts()` (คืนค่า `Future<List<ListingDraftRow>>` เรียงจากแก้ไขล่าสุด — สังเกตว่าใช้ `ListingDraftRow` ไม่ใช่ `ListingDraft` ตามที่อธิบายไว้ใน Checkpoint 2.1), และ `deleteDraft(int id)`
 - `saveDraft(...)` ต้องดึงค่า `draft.title`, `draft.category`, `draft.description` มาประกอบกับ `imagePath` ที่รับมาแยก แล้วสร้าง `ListingDraftsCompanion.insert(...)` ก่อน `.insert()` ลงฐานข้อมูล
 
-### ขั้นตอนที่ 5.2: แก้ไขหน้า "ลงประกาศขายสินค้า" ให้บันทึกร่างถาวร 🔧 ทำตามขั้นตอน 
+### ขั้นตอนที่ 5.2: แก้ไขหน้า "ลงประกาศขายสินค้า" ให้บันทึกร่างถาวร 🔧 ทำตามขั้นตอน
 
 เปิดไฟล์ `sell_item_page.dart` จากสัปดาห์ที่ 7 แก้ไข 2 จุด: (1) รับ `ListingDraftRepository` เข้ามาทาง Constructor และ (2) แก้ปุ่ม "ยืนยันร่างประกาศ" (ที่เดิมแค่เก็บค่าไว้ใน State ชั่วคราวตามใบงานสัปดาห์ที่ 7 ส่วนที่ 5.2)
 
@@ -339,18 +406,32 @@ class SellItemPage extends StatefulWidget {
 
 และในปุ่ม "ยืนยันร่างประกาศ" เปลี่ยนจากการเก็บค่าไว้ในตัวแปร State เฉย ๆ ให้เรียก `await widget.draftRepository.saveDraft(draft, imageFile!.path)` แทน จัดการ Loading/Success/Error ระหว่างบันทึกเช่นเดียวกับที่เคยทำตอนเรียก Gemini Vision ในสัปดาห์ที่ 7 แล้วค่อยแสดง `SnackBar` ยืนยันและล้างฟอร์มเหมือนเดิมหลังบันทึกสำเร็จ
 
-### ขั้นตอนที่ 5.3: สร้างหน้าจอ "ร่างประกาศของฉัน" (My Drafts) 
+### ขั้นตอนที่ 5.3: สร้างหน้าจอ "ร่างประกาศของฉัน" (My Drafts)
+
 **นักศึกษาเขียน Code เอง**
 
-สร้างหน้าจอใหม่ `lib/screens/my_drafts_page.dart` ที่รับ `ListingDraftRepository` เข้ามาทางConstructor เรียก `repository.getAllDrafts()` แสดงรายการร่างทั้งหมดที่เคยบันทึกไว้เป็น `ListView` (รูปแบบเดียวกับ `FavoritesPage` ในส่วนที่ 4.3) แต่ละรายการแสดงชื่อประกาศ หมวดหมู่ และวันเวลาที่แก้ไขล่าสุด พร้อมปุ่มลบร่างที่ไม่ต้องการแล้ว จัดการสถานะ Loading/Success/Empty ให้ครบ
+สร้างหน้าจอใหม่ `lib/screens/my_drafts_page.dart` ที่รับ `ListingDraftRepository` เข้ามาทาง Constructor เรียก `repository.getAllDrafts()` แสดงรายการร่างทั้งหมดที่เคยบันทึกไว้เป็น `ListView` (รูปแบบเดียวกับ `FavoritesPage` ในส่วนที่ 4.3) แต่ละรายการแสดงชื่อประกาศ หมวดหมู่ และวันเวลาที่แก้ไขล่าสุด พร้อมปุ่มลบร่างที่ไม่ต้องการแล้ว จัดการสถานะ Loading/Success/Empty ให้ครบ
 
 **ทำไมหน้านี้ไม่ใช่ Tab ที่ 4**: ตาม `campus_marketplace_lab_roadmap.md` หัวข้อ 2.1 มีกฎชัดเจนว่าอะไรควรเป็น Tab (ปลายทางหลักที่สลับไปมาตลอดเวลา) กับอะไรควรเป็น Push/Pop (Flow เฉพาะกิจที่มีจุดเริ่ม-จบ) "ร่างประกาศของฉัน" เป็นหน้าจัดการร่างที่ผูกกับ Flow การลงประกาศโดยตรง ไม่ใช่ปลายทางหลักที่ผู้ใช้เปิดดูตลอดเวลาเหมือน Favorites อีกทั้ง Roadmap ได้กำหนดไว้แล้วว่า Tab ที่ 4 ของแอปคือ "โปรไฟล์" ในสัปดาห์หน้า การเพิ่ม Tab ใหม่อีกตัวตอนนี้จะทำให้ลำดับ Tab ทั้งเทอมเพี้ยนไปจากแผน **จึงให้เข้าถึงหน้านี้ด้วยปุ่มไอคอนใน AppBar ของ Tab "ลงประกาศขาย" แทน** (เช่น `IconButton(icon: Icon(Icons.history), onPressed: () => Navigator.push(...))`) เพิ่ม `AppBar` ให้ `SellItemPage` ถ้ายังไม่มี แล้วใส่ปุ่มนี้ไว้ที่ `actions`
 
-> ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว 
+> ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+**1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7**
+
+<img width="358" height="828" alt="image" src="https://github.com/user-attachments/assets/8377b133-35a1-4ae1-9a1a-30b1c4675928" />
+
+**2. กดยืนยันร่าง**
+
+<img width="359" height="824" alt="image" src="https://github.com/user-attachments/assets/02bc5f25-5267-4bdb-8869-0d0a05c39d83" />
+
+**3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง**
+
+<img width="360" height="823" alt="image" src="https://github.com/user-attachments/assets/49d7e3f2-a181-44c3-b0e9-6e2b1946de0e" />
+
+**4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว**
+
+<img width="358" height="826" alt="image" src="https://github.com/user-attachments/assets/2693af13-9916-4f21-85c2-f6c2ac024ddb" />
+<img width="356" height="827" alt="image" src="https://github.com/user-attachments/assets/bcb6aad9-21c6-4e0e-9a0c-e5c1a526a454" />
 
 ---
 
@@ -360,11 +441,12 @@ class SellItemPage extends StatefulWidget {
 
 ปิด Wi-Fi และ Data บนอุปกรณ์ทดสอบ แล้วเปิดแอป `campus_marketplace_w7` เข้าไปที่ Tab "รายการโปรด" และหน้า "ร่างประกาศของฉัน"
 
-> ✅ **Checkpoint 6.1** ถ่ายภาพหน้าจอที่แสดงให้เห็นว่า Tab รายการโปรดและหน้าร่างประกาศยังคงแสดงข้อมูลได้ตามปกติแม้ไม่มีอินเทอร์เน็ตเลย (ส่วน Tab หน้าหลักที่ดึงจาก Fake Store API คาดว่าจะแสดง Error ตามปกติ เพราะยังไม่ได้ทำ Local Cache ให้หน้านั้น) 
+> ✅ **Checkpoint 6.1** ถ่ายภาพหน้าจอที่แสดงให้เห็นว่า Tab รายการโปรดและหน้าร่างประกาศยังคงแสดงข้อมูลได้ตามปกติแม้ไม่มีอินเทอร์เน็ตเลย (ส่วน Tab หน้าหลักที่ดึงจาก Fake Store API คาดว่าจะแสดง Error ตามปกติ เพราะยังไม่ได้ทำ Local Cache ให้หน้านั้น)
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="358" height="823" alt="image" src="https://github.com/user-attachments/assets/ff2153be-cb45-4aa2-ab3d-aa2d4d6a653a" />
+<img width="362" height="828" alt="image" src="https://github.com/user-attachments/assets/76944d4a-2d53-4bcb-a787-e306a2dbe08c" />
+<img width="362" height="829" alt="image" src="https://github.com/user-attachments/assets/1db9e120-869b-42cd-b628-aecae131669a" />
+<img width="357" height="823" alt="image" src="https://github.com/user-attachments/assets/de4bd65c-0544-4271-b9d2-68024baf7e30" />
 
 ---
 
