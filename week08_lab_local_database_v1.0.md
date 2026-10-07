@@ -55,8 +55,11 @@
 
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
-```text
-บันทึกผลลัพธ์ที่นี่
+<img width="783" height="761" alt="image" src="https://github.com/user-attachments/assets/2b1ddca1-6f38-4a9e-a822-0f586187319f" />
+<img width="730" height="645" alt="image" src="https://github.com/user-attachments/assets/ed6d147f-a28c-4f12-a266-18ba311c1685" />
+<img width="694" height="221" alt="image" src="https://github.com/user-attachments/assets/0cda41c6-6a39-44c5-80c0-4e2e04916108" />
+
+
 ```
 
 
@@ -71,8 +74,17 @@
 
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
-```text
-บันทึกผลลัพธ์ที่นี่
+ข้อ 1 Primary Key
+Primary Key ของแต่ละตารางควรเป็น Integer และใช้ Auto Increment เพื่อให้แต่ละรายการมีหมายเลขประจำตัวที่ไม่ซ้ำกัน และให้ฐานข้อมูลสร้างค่า id ให้โดยอัตโนมัติ
+ข้อ 2 ราคา
+
+คอลัมน์ราคาควรใช้ RealColumn หรือ double เนื่องจากราคาสินค้าอาจมีค่าทศนิยม จึงเหมาะกับข้อมูลประเภทตัวเลขที่มีทศนิยมมากกว่า Integer
+ข้อ 3 ทำไม Favorites ต้องเก็บข้อมูลสินค้าไว้ด้วย
+
+ควรเก็บข้อมูล เช่น ชื่อ ราคา และรูปภาพไว้ในตาราง Favorites ด้วย เพราะระบบต้องสามารถแสดงรายการโปรดได้แม้ไม่มีอินเทอร์เน็ต หากเก็บแค่ itemId แล้วต้องเรียก API ใหม่ จะไม่สามารถแสดงข้อมูลได้เมื่อไม่มีอินเทอร์เน็ต ซึ่งไม่ตรงกับแนวคิด Offline-first
+ข้อ 4 ทำไม itemId ต้อง Unique
+
+ควรกำหนด itemId เป็น Unique เพราะสินค้าแต่ละชิ้นควรมีรายการโปรดได้เพียงหนึ่งรายการ หากไม่มี Unique ผู้ใช้อาจกดหัวใจสินค้าชิ้นเดิมหลายครั้งจนเกิดข้อมูลซ้ำในฐานข้อมูล
 ```
 
 ---
@@ -171,8 +183,8 @@ dart run build_runner build --delete-conflicting-outputs
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
 
-```text
-บันทึกผลลัพธ์ที่นี่
+<img width="1915" height="1008" alt="image" src="https://github.com/user-attachments/assets/aa25158b-6142-48e8-9894-a88f2fd5c837" />
+
 ```
 
 ---
@@ -298,8 +310,10 @@ items: const [
 
 > ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ: (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
 
-```text
-บันทึกผลลัพธ์ที่นี่
+<img width="1254" height="539" alt="image" src="https://github.com/user-attachments/assets/a6d46025-4d47-4294-850b-d6005e8f4df7" />
+<img width="1253" height="648" alt="image" src="https://github.com/user-attachments/assets/415e7900-cd2b-436e-91da-3abe671caf6b" />
+<img width="1257" height="643" alt="image" src="https://github.com/user-attachments/assets/e70421d5-8bad-4688-9e5d-ff28bf875cda" />
+
 ```
 
 ---
@@ -348,8 +362,10 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว 
 
-```text
-บันทึกผลลัพธ์ที่นี่
+<img width="1248" height="611" alt="image" src="https://github.com/user-attachments/assets/1c47cb9c-8e09-47e4-8b0e-fbe42e2e393b" />
+<img width="1234" height="681" alt="image" src="https://github.com/user-attachments/assets/2ea334c8-9dcf-455d-9644-a65253c6ded4" />
+<img width="1257" height="702" alt="image" src="https://github.com/user-attachments/assets/35ce86b1-ca65-4dc0-ad75-e866bc6bf868" />
+
 ```
 
 ---
@@ -362,8 +378,9 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 6.1** ถ่ายภาพหน้าจอที่แสดงให้เห็นว่า Tab รายการโปรดและหน้าร่างประกาศยังคงแสดงข้อมูลได้ตามปกติแม้ไม่มีอินเทอร์เน็ตเลย (ส่วน Tab หน้าหลักที่ดึงจาก Fake Store API คาดว่าจะแสดง Error ตามปกติ เพราะยังไม่ได้ทำ Local Cache ให้หน้านั้น) 
 
-```text
-บันทึกผลลัพธ์ที่นี่
+รูปอยู่ใน readme ครับ
+
+
 ```
 
 ---
