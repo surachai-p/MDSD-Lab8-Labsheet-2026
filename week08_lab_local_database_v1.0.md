@@ -56,7 +56,49 @@
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+import 'package:drift/drift.dart';
+
+// ตารางที่ 1: รายการสินค้าที่ถูกใจ (Favorites / Wishlist Cache)
+class FavoriteProducts extends Table {
+  // รหัสสินค้าจาก API/Server ใช้เป็น Primary Key เพื่อป้องกันข้อมูลซ้ำซ้อน
+  IntColumn get productId => integer()();
+  
+  // ชื่อสินค้า
+  TextColumn get title => text()();
+  
+  // ราคาสินค้า (รองรับทศนิยม)
+  RealColumn get price => real()();
+  
+  // URL รูปภาพสินค้าสำหรับนำไปแสดงผล (Remote URL)
+  TextColumn get imageUrl => text()();
+  
+  // วัน-เวลาที่กดถูกใจ กำหนด Default เป็นเวลาปัจจุบัน
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+// ตารางที่ 2: ร่างประกาศขายสินค้าจาก AI (AI Product Drafts)
+class ProductDrafts extends Table {
+  // รหัสร่างประกาศ สร้างให้อัตโนมัติ (1, 2, 3, ...)
+  IntColumn get id => integer().autoIncrement()();
+  
+  // path ของรูปภาพที่อยู่ในเครื่อง (Local File Path)
+  TextColumn get localImagePath => text()();
+  
+  // ชื่อสินค้า (อนุญาตให้เป็น null ได้ เผื่อ AI ยังวิเคราะห์ไม่เสร็จ หรือผู้ใช้ลบออก)
+  TextColumn get title => text().nullable()();
+  
+  // หมวดหมู่สินค้า
+  TextColumn get category => text().nullable()();
+  
+  // คำบรรยายสินค้า
+  TextColumn get description => text().nullable()();
+  
+  // วัน-เวลาที่แก้ไขล่าสุด
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
 ```
 
 
@@ -72,7 +114,10 @@
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+1. ถูกครึ่งเดียว ตาราง Drafts กำหนด PK เป็น id แบบรันอัตโนมัติถูกต้อง แต่ตาราง Favorites พลาดตรงที่เอา "รหัสสินค้าจาก API" มาเป็น Primary Key โดยตรง แก้โดยให้สร้างคอลัมน์ id ของตารางเราเอง รันเลข 1, 2, 3 อัตโนมัติ แล้วค่อยสร้างอีกคอลัมน์ชื่อ itemId เก็บเลขสินค้าจาก API
+2. ผ่าน ใช้ชนิดข้อมูลทศนิยม (real) ตรงตามบทเรียน ไม่ต้องแก้อะไร
+3. ผ่าน เพราะไม่ได้เก็บแค่รหัสสินค้า แต่เก็บชื่อสินค้า ราคาและลิงก์รูปภาพ ทำให้เมื่อปิดเน็ตก็ยังดูของที่กดถูกใจไว้ได้
+4. เดิมทีเอาเลขสินค้าเป็น Primary Key มันเลยไม่ยอมให้บันทึกซ้ำอยู่แล้ว พอเราเปลี่ยน Primary Key มาเป็นเลขรันอัตโนมัติของเครื่องตัวเอง ถ้าเราไม่สั่ง .unique() ที่คอลัมน์ itemId ผู้ใช้จะสามารถกดหัวใจสินค้าชิ้นเดิมซ้ำ ๆ แล้วข้อมูลจะเบิ้ลเข้าไปในตารางเรื่อย ๆ แก้โดยต้องเติมคำสั่ง .unique() กำกับไว้ที่คอลัมน์ itemId เพื่อห้ามไม่ให้บันทึกรหัสสินค้าเดิมซ้ำ
 ```
 
 ---
@@ -171,9 +216,9 @@ dart run build_runner build --delete-conflicting-outputs
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="653" height="391" alt="image" src="https://github.com/user-attachments/assets/d0b3def4-e826-42d0-afdd-6244e9a299a3" />
+<img width="862" height="588" alt="image" src="https://github.com/user-attachments/assets/1c47a54b-925e-4786-a824-06c55dcd054b" />
+
 
 ---
 
@@ -298,9 +343,18 @@ items: const [
 
 > ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ: (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+(ก)
+<img width="1252" height="677" alt="image" src="https://github.com/user-attachments/assets/cc614e86-4e52-479c-9c1c-7b18948b6a52" />
+(ข)
+<img width="1253" height="740" alt="image" src="https://github.com/user-attachments/assets/c03cf67e-a345-423c-98ed-f91df9300ffa" />
+(ค)
+<img width="1252" height="741" alt="image" src="https://github.com/user-attachments/assets/a97f957a-6bc0-46b7-8020-20dd1a44c771" />
+ทดสอบลบ
+<img width="1252" height="737" alt="image" src="https://github.com/user-attachments/assets/5a260d03-6fdb-46a3-880a-ff146261cf55" />
+(ง)
+<img width="1252" height="737" alt="image" src="https://github.com/user-attachments/assets/fc6f1fe4-8f28-4c6c-b4a6-9870a69e2992" />
+
+
 
 ---
 
@@ -348,9 +402,16 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว 
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+ขั้นที่ 1
+<img width="1252" height="731" alt="image" src="https://github.com/user-attachments/assets/cfc5ecf5-88f1-4873-ac31-db0f3834b4b8" />
+ขั้นที่ 2
+<img width="1251" height="737" alt="image" src="https://github.com/user-attachments/assets/8dbeedc5-ebb0-4614-ade0-f247798ede18" />
+ขั้นที่ 3
+<img width="1252" height="742" alt="image" src="https://github.com/user-attachments/assets/10edad8f-e3fb-47b6-97e7-7902020685fc" />
+ขั้นที่ 4 (หลังปิดแอป)
+<img width="1253" height="740" alt="image" src="https://github.com/user-attachments/assets/44b39fa8-2719-4e2d-8bfa-25b5d629fd4a" />
+
+
 
 ---
 
@@ -362,10 +423,15 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 6.1** ถ่ายภาพหน้าจอที่แสดงให้เห็นว่า Tab รายการโปรดและหน้าร่างประกาศยังคงแสดงข้อมูลได้ตามปกติแม้ไม่มีอินเทอร์เน็ตเลย (ส่วน Tab หน้าหลักที่ดึงจาก Fake Store API คาดว่าจะแสดง Error ตามปกติ เพราะยังไม่ได้ทำ Local Cache ให้หน้านั้น) 
 
+หน้าแรก
+<img width="1255" height="736" alt="image" src="https://github.com/user-attachments/assets/7f0ffc99-f510-4b9d-8b17-f2330b463594" />
+รายการโปรด
+<img width="1251" height="731" alt="image" src="https://github.com/user-attachments/assets/67d80dd2-76a0-4cfc-8d77-d53bdbc2c301" />
+ร่างประกาศ
+<img width="1251" height="735" alt="image" src="https://github.com/user-attachments/assets/c99792c1-208d-4062-ba85-e433dc4c681a" />
 ```text
-บันทึกผลลัพธ์ที่นี่
+หน้าหลักแสดง error เพราะต้องดึงข้อมูลจาก Fake Store API ผ่านอินเทอร์เน็ต ส่วนรายการโปรดและร่างประกาศยังแสดงได้ เพราะอ่านจากฐานข้อมูล Drift ในเครื่อง รูปในรายการโปรดไม่ขึ้นเพราะเก็บไว้แค่ลิงก์ (ต้องโหลดจากเน็ต) แต่รูปในร่างประกาศขึ้นเพราะเป็นไฟล์ที่อยู่ในเครื่องอยู่แล้ว
 ```
-
 ---
 
 ## ปัญหาที่พบบ่อยและวิธีแก้ไข (Troubleshooting)
