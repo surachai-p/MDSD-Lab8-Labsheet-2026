@@ -56,7 +56,41 @@
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+import 'package:drift/drift.dart';
+
+/// 1. ตารางเก็บรายการสินค้าที่ถูกใจ (Favorite Products)
+class FavoriteProducts extends Table {
+  // รหัสสินค้าจากระบบหลัก ใช้เป็น Primary Key เพื่อป้องกันการบันทึกซ้ำ
+  IntColumn get productId => integer()();
+
+  // ข้อมูลแสดงผลแบบ Offline Cache
+  TextColumn get name => text()();
+  RealColumn get price => real()();
+  TextColumn get imageUrl => text()();
+
+  // เวลาที่กดถูกใจ (ค่าเริ่มต้นเป็นเวลาปัจจุบัน)
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+/// 2. ตารางเก็บร่างประกาศขายสินค้าที่ AI ช่วยแนะนำ (Listing Drafts)
+class ListingDrafts extends Table {
+  // รหัสร่างประกาศ สร้างให้อัตโนมัติ (1, 2, 3, ...)
+  IntColumn get id => integer().autoIncrement()();
+
+  // รูปภาพที่ผู้ใช้เลือกมาให้ AI วิเคราะห์ (ต้องมีเสมอ)
+  TextColumn get imagePath => text()();
+
+  // ข้อมูลที่ AI ช่วย Generate (เปิดเป็น nullable เผื่อกรณี AI กำลังประมวลผลหรือผู้ใช้ยังไม่ได้กรอก)
+  TextColumn get title => text().nullable()();
+  TextColumn get category => text().nullable()();
+  TextColumn get description => text().nullable()();
+
+  // วันและเวลาที่แก้ไขล่าสุด
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
 ```
 
 
@@ -72,7 +106,9 @@
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+1. Gemini กำหนด Primary Key ให้แต่ละตารางถูกต้องหรือไม่ตาราง ListingDrafts ถูกต้องแล้วเพราะใช้ Auto-increment แต่ตาราง Favorites ยังไม่ตรงกับบทเรียน เพราะบทเรียนแนะนำให้ใช้ id เป็น Auto-increment แล้วใช้ itemId ในการอ้างอิงสินค้าแทน   2. คอลัมน์ราคาสินค้า Gemini เลือกชนิดข้อมูลใดเลือกใช้ RealColumn (double) ซึ่งถูกต้องแล้ว เพราะราคาสินค้าสามารถมีเศษทศนิยมได้
+3. เก็บสำเนาข้อมูลหรือเก็บแค่ itemIdควรเก็บสำเนาข้อมูลที่จำเป็น (เช่น itemId, ชื่อ, ราคา, รูปภาพ) ไว้ด้วย เพื่อให้เปิดดูรายการโปรดได้ทันทีแม้ไม่มีอินเทอร์เน็ต หากเก็บแค่ itemId แล้วต้องยิง API ใหม่ตลอด จะใช้งานแบบ Offline-first ไม่ได้
+4. กำหนดให้คอลัมน์ที่อ้างอิงสินค้าห้ามซ้ำกันหรือไม่ควรเพิ่ม .unique() ที่คอลัมน์อ้างอิงสินค้า (itemId) เพื่อป้องกันไม่ให้ผู้ใช้กดถูกใจสินค้าชิ้นเดิมซ้ำ จนเกิดข้อมูลซ้ำซ้อนสะสมในตาราง
 ```
 
 ---
@@ -174,6 +210,8 @@ capture หน้าจอผลลัพธ์คำสั่ง `dart run buil
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+<img width="775" height="177" alt="image" src="https://github.com/user-attachments/assets/233cb1ac-81b3-458e-9f0e-bbee9ca8b7fa" />
+
 
 ---
 
@@ -301,6 +339,29 @@ items: const [
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+1.กดหัวใจที่สินค้า 3 ชิ้น
+
+<img width="420" height="972" alt="image" src="https://github.com/user-attachments/assets/916b6845-7613-4cad-8fd8-2d546ae2310f" />
+
+2.เห็นสินค้าในรายการโปรดครบ 3 ชิ้น
+
+<img width="425" height="975" alt="image" src="https://github.com/user-attachments/assets/3fc862f8-d098-4f0c-9f1f-5412816b835d" />
+
+3.ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน
+
+<img width="417" height="980" alt="image" src="https://github.com/user-attachments/assets/60a439e8-35ee-4d90-9fe1-c2cc5b1f86dd" />
+
+<img width="427" height="973" alt="image" src="https://github.com/user-attachments/assets/fdfd2312-e1c1-4792-96c2-9214292e89d3" />
+
+<img width="415" height="973" alt="image" src="https://github.com/user-attachments/assets/a6f0499a-fa95-4bb4-9282-6f7107498e94" />
+
+4. กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
+
+<img width="416" height="970" alt="image" src="https://github.com/user-attachments/assets/71347bc4-d312-4dce-be14-67d84ddade95" />
+
+
+
+
 
 ---
 
@@ -351,7 +412,23 @@ class SellItemPage extends StatefulWidget {
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+ 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI
+    
+<img width="417" height="980" alt="image" src="https://github.com/user-attachments/assets/76710486-1eb0-4f38-b1d0-e9765db88c42" />
 
+2. กดยืนยันร่าง
+
+<img width="415" height="975" alt="image" src="https://github.com/user-attachments/assets/85423293-9de2-4d2d-8b04-944105e3b7f0" />
+
+3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง
+
+<img width="428" height="435" alt="image" src="https://github.com/user-attachments/assets/7ea5e2d2-75e1-4737-818e-78a2529b8db6" />
+
+4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง
+
+<img width="417" height="563" alt="image" src="https://github.com/user-attachments/assets/dda32eff-35e7-4d9a-a807-c8dbbc8ec70b" />
+
+   
 ---
 
 ## ส่วนที่ 6: ทดสอบสถานการณ์ Offline-first
@@ -365,6 +442,13 @@ class SellItemPage extends StatefulWidget {
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+1. ภาพหน้าจอที่แสดงให้เห็นว่า Tab รายการโปรดและหน้าร่างประกาศยังคงแสดงข้อมูลได้ตามปกติแม้ไม่มีอินเทอร์เน็ตเลย
+   
+<img width="418" height="962" alt="image" src="https://github.com/user-attachments/assets/ea813b4b-5ee8-4811-84e0-4044e77d1e6c" />
+
+<img width="417" height="967" alt="image" src="https://github.com/user-attachments/assets/d68b9df5-5f1e-4f99-a5be-a16cb9eb97e7" />
+
+
 
 ---
 
