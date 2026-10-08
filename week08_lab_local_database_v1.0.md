@@ -56,7 +56,53 @@
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+import 'package:drift/drift.dart';
+
+// ------------------------------------------------------
+// ตารางที่ 1: รายการสินค้าที่ผู้ใช้กดถูกใจ (Cached Favorites)
+// ------------------------------------------------------
+class FavoriteProducts extends Table {
+  // รหัสสินค้าจากระบบหลัก (กำหนดเป็น Primary Key เพื่อป้องกันข้อมูลซ้ำ)
+  IntColumn get productId => integer()();
+
+  // ชื่อสินค้า สำหรับแสดงผลแบบออฟไลน์
+  TextColumn get title => text()();
+
+  // ราคาสินค้า (รองรับทศนิยม)
+  RealColumn get price => real()();
+
+  // ลิงก์รูปภาพสินค้า (เปิดให้เป็น null ได้ เผื่อสินค้าไม่มีภาพ)
+  TextColumn get imageUrl => text().nullable()();
+
+  // วันและเวลาที่กดถูกใจ
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+// ------------------------------------------------------
+// ตารางที่ 2: ร่างประกาศขายสินค้าที่ AI ช่วยแนะนำ (AI Listing Drafts)
+// ------------------------------------------------------
+class AiListingDrafts extends Table {
+  // Primary Key ประจำตารางในเครื่อง (รันตัวเลขอัตโนมัติ)
+  IntColumn get id => integer().autoIncrement()();
+
+  // ชื่อประกาศ (nullable: เผื่อ AI สรุปยังไม่เสร็จ หรือผู้ใช้ลบออกเพื่อพิมพ์ใหม่)
+  TextColumn get title => text().nullable()();
+
+  // หมวดหมู่สินค้า
+  TextColumn get category => text().nullable()();
+
+  // คำบรรยายสินค้า
+  TextColumn get description => text().nullable()();
+
+  // พาธของไฟล์ภาพในเครื่อง (จำเป็นต้องมีเสมอ เพราะเป็น Input หลักของ AI)
+  TextColumn get localImagePath => text()();
+
+  // วันและเวลาที่แก้ไขล่าสุด
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
 ```
 
 
@@ -71,8 +117,27 @@
 
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
+
+<img width="1917" height="1037" alt="image" src="https://github.com/user-attachments/assets/ed03e7d9-dea5-4cfa-a0e3-3748b40728e1" />
+<img width="1510" height="812" alt="image" src="https://github.com/user-attachments/assets/abec04ba-53bf-4666-92bf-bb3afa7c0641" />
+<img width="1906" height="1082" alt="image" src="https://github.com/user-attachments/assets/8212231b-3498-411b-94ab-c8942c17402e" />
+
 ```text
-บันทึกผลลัพธ์ที่นี่
+ข้อ 1 Primary Key
+
+ตาราง AiListingDrafts ใช้ id แบบ autoIncrement() ถูกต้องตามบทเรียน แต่ตาราง FavoriteProducts ใช้ productId ที่มาจาก API เป็น Primary Key ซึ่งไม่ตรงกับบทเรียน วิธีนี้ทำให้ Primary Key ขึ้นอยู่กับระบบภายนอก จึงแก้เป็นเพิ่ม id แบบ Auto-increment เป็น Primary Key และแยก itemId ไว้เป็นคอลัมน์อ้างอิงสินค้า
+
+ข้อ 2 ชนิดข้อมูลราคา
+
+Gemini เลือก RealColumn ตรงกับบทเรียน ไม่ต้องแก้ เพราะราคามีทศนิยม (เช่น 109.95) และตรงกับ Item.price ที่เป็น double
+
+ข้อ 3 เก็บสำเนาข้อมูลหรือเก็บแค่ itemId
+
+Gemini เก็บสำเนาชื่อ ราคา และรูปภาพไว้ในตารางด้วย ซึ่งเหมาะกับหลัก Offline-first เพราะถ้าเก็บแค่ itemId แล้วต้องเรียก API ทุกครั้ง ตอนไม่มีอินเทอร์เน็ตจะแสดงรายการโปรดไม่ได้เลย การเก็บข้อมูลที่ใช้แสดงผลไว้ในเครื่องทำให้เปิดหน้ารายการโปรดได้ทันทีแม้ออฟไลน์
+
+ข้อ 4 .unique() บน itemId
+
+Gemini ไม่ได้ใส่ .unique() แต่ใช้ productId เป็น Primary Key ซึ่งห้ามซ้ำอยู่แล้ว เมื่อแก้ตามข้อ 1 ให้ id เป็น Primary Key แทน itemId จะไม่ถูกบังคับห้ามซ้ำ จึงต้องเพิ่ม .unique() เอง เพื่อไม่ให้ผู้ใช้กดถูกใจสินค้าเดิมซ้ำจนตารางมีแถวซ้ำสะสม
 ```
 
 ---
@@ -171,9 +236,8 @@ dart run build_runner build --delete-conflicting-outputs
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="1917" height="1138" alt="image" src="https://github.com/user-attachments/assets/51b89801-cbb5-4ce8-af46-1a9d9e48b06e" />
+
 
 ---
 
@@ -298,9 +362,11 @@ items: const [
 
 > ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ: (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="1917" height="1127" alt="image" src="https://github.com/user-attachments/assets/7ea22da9-8ef0-478e-8205-6b5d6f730212" />
+
+## กดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว
+<img width="1916" height="1137" alt="image" src="https://github.com/user-attachments/assets/257db4fe-7188-42ef-a45e-d953ab9bdea3" />
+
 
 ---
 
@@ -346,11 +412,19 @@ class SellItemPage extends StatefulWidget {
 
 **ทำไมหน้านี้ไม่ใช่ Tab ที่ 4**: ตาม `campus_marketplace_lab_roadmap.md` หัวข้อ 2.1 มีกฎชัดเจนว่าอะไรควรเป็น Tab (ปลายทางหลักที่สลับไปมาตลอดเวลา) กับอะไรควรเป็น Push/Pop (Flow เฉพาะกิจที่มีจุดเริ่ม-จบ) "ร่างประกาศของฉัน" เป็นหน้าจัดการร่างที่ผูกกับ Flow การลงประกาศโดยตรง ไม่ใช่ปลายทางหลักที่ผู้ใช้เปิดดูตลอดเวลาเหมือน Favorites อีกทั้ง Roadmap ได้กำหนดไว้แล้วว่า Tab ที่ 4 ของแอปคือ "โปรไฟล์" ในสัปดาห์หน้า การเพิ่ม Tab ใหม่อีกตัวตอนนี้จะทำให้ลำดับ Tab ทั้งเทอมเพี้ยนไปจากแผน **จึงให้เข้าถึงหน้านี้ด้วยปุ่มไอคอนใน AppBar ของ Tab "ลงประกาศขาย" แทน** (เช่น `IconButton(icon: Icon(Icons.history), onPressed: () => Navigator.push(...))`) เพิ่ม `AppBar` ให้ `SellItemPage` ถ้ายังไม่มี แล้วใส่ปุ่มนี้ไว้ที่ `actions`
 
-> ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว 
+> ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว
+> 
+## สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI 
+<img width="1875" height="1108" alt="image" src="https://github.com/user-attachments/assets/f2c2793a-1065-4432-b9d6-b1501a2cc14d" />
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+## กดยืนยันร่าง
+<img width="1916" height="1138" alt="image" src="https://github.com/user-attachments/assets/eab167e5-3654-46a4-9f68-4c1c295351c3" />
+
+## กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง
+<img width="1917" height="1140" alt="image" src="https://github.com/user-attachments/assets/88db795f-134d-45ac-a7a1-22b43a24b41e" />
+
+## กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง พิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว
+<img width="1916" height="1142" alt="image" src="https://github.com/user-attachments/assets/62c39227-91e9-495d-90c1-f50cf2ad3360" />
 
 ---
 
@@ -362,10 +436,18 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 6.1** ถ่ายภาพหน้าจอที่แสดงให้เห็นว่า Tab รายการโปรดและหน้าร่างประกาศยังคงแสดงข้อมูลได้ตามปกติแม้ไม่มีอินเทอร์เน็ตเลย (ส่วน Tab หน้าหลักที่ดึงจาก Fake Store API คาดว่าจะแสดง Error ตามปกติ เพราะยังไม่ได้ทำ Local Cache ให้หน้านั้น) 
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="1910" height="1146" alt="image" src="https://github.com/user-attachments/assets/7afc22ca-1f43-4582-a77f-1c846f80938f" />
+<img width="1912" height="1132" alt="image" src="https://github.com/user-attachments/assets/fbcced04-397d-4e47-918f-1d846036aad0" />
+<img width="1915" height="1140" alt="image" src="https://github.com/user-attachments/assets/901558a8-b93a-463b-89bd-26ecb70c8baf" />
 
+```
+เมื่อเปิด Airplane mode แล้วปิดเปิดแอปใหม่ Tab หน้าหลักแสดง error "ไม่สามารถเชื่อมต่ออินเทอร์เน็ตได้" เพราะ ItemRepositoryApi ต้องดึงข้อมูลจาก Fake Store API ซึ่งเป็นผลที่คาดไว้ เพราะยังไม่ได้ทำ Local Cache ให้หน้านี้
+
+ส่วน Tab รายการโปรดและหน้าร่างประกาศของฉันยังแสดงข้อมูลได้ตามปกติ เพราะ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift อ่านจากฐานข้อมูล Drift ในเครื่องเท่านั้น ไม่มีการเรียก API ตามหลัก Offline-first
+
+ข้อสังเกต รูปในรายการโปรดไม่แสดงตอนออฟไลน์ เพราะตาราง FavoriteItems เก็บแค่ imageUrl และ Image.network() ต้องดาวน์โหลดรูปผ่านอินเทอร์เน็ต ส่วนรูปย่อในร่างประกาศแสดงได้ เพราะเก็บ imagePath ที่ชี้ไปยังไฟล์ในเครื่องและแสดงด้วย Image.file() ถ้าต้องการให้รูปในรายการโปรดแสดงได้ตอนออฟไลน์ ต้องเก็บไฟล์รูปไว้ในเครื่องด้วย
+
+```
 ---
 
 ## ปัญหาที่พบบ่อยและวิธีแก้ไข (Troubleshooting)
