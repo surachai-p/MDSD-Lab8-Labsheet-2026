@@ -57,6 +57,53 @@
 
 ```text
 บันทึกผลลัพธ์ที่นี่
+import 'package:drift/drift.dart';
+
+// ----------------------------------------------------
+// 1. ตารางเก็บรายการสินค้าที่ถูกใจ (FavoriteProducts)
+// ----------------------------------------------------
+class FavoriteProducts extends Table {
+  // รหัสสินค้าจาก Backend/API ใช้เป็น Primary Key
+  IntColumn get productId => integer()();
+
+  // ชื่อสินค้า สำหรับแสดงผลเบื้องต้น
+  TextColumn get title => text().withLength(min: 1, max: 255)();
+
+  // ราคาสินค้า รองรับทศนิยม
+  RealColumn get price => real()();
+
+  // URL ของรูปภาพ (อาจเป็น null ได้หากสินค้านั้นไม่มีรูป)
+  TextColumn get imageUrl => text().nullable()();
+
+  // เวลาที่กดถูกใจ กำหนด default เป็นเวลาปัจจุบัน ณ ตอนบันทึก
+  DateTimeColumn get favoritedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+// ----------------------------------------------------
+// 2. ตารางเก็บร่างประกาศขายสินค้าจาก AI (ListingDrafts)
+// ----------------------------------------------------
+class ListingDrafts extends Table {
+  // ไอดีของร่างประกาศในเครื่อง รันเลขอัตโนมัติ
+  IntColumn get id => integer().autoIncrement()();
+
+  // Path ของรูปภาพในเครื่อง (เช่น /data/user/0/.../cache/image.jpg)
+  TextColumn get imagePath => text()();
+
+  // หัวข้อประกาศ (อนุญาตให้เป็น null เผื่อ AI วิเคราะห์ยังไม่เสร็จ หรือผู้ใช้ลบออก)
+  TextColumn get title => text().nullable()();
+
+  // หมวดหมู่สินค้า
+  TextColumn get category => text().nullable()();
+
+  // รายละเอียดสินค้า
+  TextColumn get description => text().nullable()();
+
+  // เวลาที่แก้ไขล่าสุด เพื่อใช้เรียงลำดับดึงร่างล่าสุดมาแสดง
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
 ```
 
 
@@ -73,8 +120,16 @@
 
 ```text
 บันทึกผลลัพธ์ที่นี่
-```
+1.Primary Key ในตาราง ListingDrafts Gemini ทำถูกต้อง ใช้ Auto-increment แต่ในตาราง FavoriteProducts ใช้ productId เป็น PK โดยตรงควรแก้ให้มีคอลัมน์ id แบบ Auto-increment Integer เพิ่ม
 
+2.ชนิดข้อมูลราคา ถูกต้อง ตรงตามบทเรียน เลือกใช้ RealColumn / real()
+
+3.เรื่องการเก็บข้อมูล Favorites Gemini ทำถูกตามหลัก Offline-first เพราะไม่ได้เก็บแค่ ID สินค้า แต่ดึงชื่อ ราคา รูป เก็บไว้ในเครื่องด้วย เวลาผู้ใช้ไม่มีเน็ตก็ยังเปิดดูรายการโปรดได้อยู่ ไม่ขึ้นหน้าว่าง
+
+4..unique() กันข้อมูลซ้ำ Gemini ไม่ได้ใส่คำว่า .unique() มาตรงๆ แต่ไปใช้วิธีล็อก PK ไว้แทน ซึ่งถ้าเราเปลี่ยนไปใช้ id รันเลขอัตโนมัติ ก็จำเป็นต้องเติม .unique() ให้ id สินค้าเอง เพื่อกันผู้ใช้กดหัวใจซ้ำ
+```
+![alt text](image/image.png)
+![alt text](image/image-1.png)
 ---
 
 ## ส่วนที่ 2: ติดตั้ง Drift และประกาศตาราง
@@ -174,6 +229,10 @@ capture หน้าจอผลลัพธ์คำสั่ง `dart run buil
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+#### หน้าจอผลลัพธ์คำสั่ง dart run build_runner build จากขั้นตอนที่ 3.2
+![alt text](image/image-2.png)
+#### เปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3
+![alt text](image/image-3.png)
 
 ---
 
@@ -301,6 +360,20 @@ items: const [
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+#### (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home
+![alt text](image/image-4.png)
+![alt text](image/image-5.png)
+#### (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น
+![alt text](image/image-6.png)
+#### (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง
+![alt text](image/image-7.png)
+![alt text](image/image-8.png)
+![alt text](image/image-9.png)
+#### (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำ
+![alt text](image/image-10.png)
+![alt text](image/image-11.png)
+
+
 
 ---
 
@@ -352,6 +425,18 @@ class SellItemPage extends StatefulWidget {
 บันทึกผลลัพธ์ที่นี่
 ```
 
+#### 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7
+![alt text](image/image-12.png)
+
+#### 2. กดยืนยันร่าง
+![alt text](image/image-13.png)
+
+#### 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง
+![alt text](image/image-14.png)
+
+#### 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง
+![alt text](image/image-15.png)
+![alt text](image/image-16.png)
 ---
 
 ## ส่วนที่ 6: ทดสอบสถานการณ์ Offline-first
@@ -365,6 +450,10 @@ class SellItemPage extends StatefulWidget {
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+![alt text](<image/Screenshot 2026-10-08 184247.png>)
+![alt text](<image/Screenshot 2026-10-08 184407.png>)
+![alt text](<image/Screenshot 2026-10-08 184537.png>)
+![alt text](<image/Screenshot 2026-10-08 184544.png>)
 
 ---
 

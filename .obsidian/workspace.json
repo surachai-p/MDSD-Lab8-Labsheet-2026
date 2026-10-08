@@ -1,0 +1,219 @@
+{
+  "main": {
+    "id": "557372b7d403e167",
+    "type": "split",
+    "children": [
+      {
+        "id": "81759ddcd397a886",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "a56806e24f0c3dc7",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "week08_lab_local_database_v1.0.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "week08_lab_local_database_v1.0"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "bc51d9e55228b09c",
+    "type": "split",
+    "children": [
+      {
+        "id": "c52ac0f4811d5fcd",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "2099a2eb3b501a1e",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "65a552ff63687012",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "6a94642e785b1c21",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "d6dc2999cd9d20fa",
+    "type": "split",
+    "children": [
+      {
+        "id": "bf8e62eed2c96c43",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "7b5302cfde93ef45",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "week08_lab_local_database_v1.0.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "a3785c85460b165a",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "week08_lab_local_database_v1.0.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "6050124925f6a01a",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "066088824a81bd92",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "2af1e7544618f45a",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "week08_lab_local_database_v1.0.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "a56806e24f0c3dc7",
+  "lastOpenFiles": [
+    "image-15.png",
+    "Screenshot 2026-10-08 184053.png",
+    "image/Screenshot 2026-10-08 184544.png",
+    "image/Screenshot 2026-10-08 184537.png",
+    "image/Screenshot 2026-10-08 184407.png",
+    "image/Screenshot 2026-10-08 184247.png",
+    "image/image-16.png",
+    "image/image-15.png",
+    "image/image-14.png",
+    "image/image-13.png",
+    "image/image-12.png",
+    "image",
+    "campus_marketplace_w7/README.md",
+    "image-9.png.md",
+    "week08_lab_local_database_v1.0.md",
+    "campus_marketplace_w7/build/fd29e1d1",
+    "campus_marketplace_w7/build/app/intermediates/compressed_assets/debug/compressDebugAssets/out/assets/flutter_assets/kernel_blob.bin.jar",
+    "campus_marketplace_w7/build/jni/intermediates/cxx/Debug/254s3k11/logs/x86_64/generate_cxx_metadata_4993_timing.txt",
+    "campus_marketplace_w7/build/jni/intermediates/cxx/Debug/254s3k11/logs/x86/generate_cxx_metadata_4993_timing.txt",
+    "campus_marketplace_w7/build/jni/intermediates/cxx/Debug/254s3k11/logs/armeabi-v7a/generate_cxx_metadata_5005_timing.txt",
+    "campus_marketplace_w7/build/app/intermediates/cxx/debug/4p6i1n18/logs/x86_64/generate_cxx_metadata_5001_timing.txt",
+    "campus_marketplace_w7/build/app/intermediates/cxx/debug/4p6i1n18/logs/arm64-v8a/generate_cxx_metadata_5007_timing.txt",
+    "campus_marketplace_w7/build/app/intermediates/assets/debug/mergeDebugAssets/flutter_assets/fonts/MaterialIcons-Regular.otf",
+    "campus_marketplace_w7/build/app/intermediates/assets/debug/mergeDebugAssets/flutter_assets/kernel_blob.bin",
+    "campus_marketplace_w7/ios/Runner/Assets.xcassets/LaunchImage.imageset/README.md"
+  ]
+}
