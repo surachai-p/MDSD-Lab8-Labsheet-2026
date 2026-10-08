@@ -55,8 +55,46 @@
 
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
-```text
-บันทึกผลลัพธ์ที่นี่
+```dart
+import 'package:drift/drift.dart';
+
+// ----------------------------------------------------------------------
+// 1. ตารางเก็บสินค้าที่ถูกใจ (FavoriteProducts)
+// ----------------------------------------------------------------------
+class FavoriteProducts extends Table {
+  // รหัสสินค้าจากระบบ Backend
+  IntColumn get productId => integer()();
+
+  // ข้อมูลพื้นฐานสำหรับแสดงผลแบบ Offline/Cache
+  TextColumn get title => text().withLength(min: 1, max: 255)();
+  RealColumn get price => real()();
+  TextColumn get imageUrl => text()();
+
+  // เวลาที่กดถูกใจ เพื่อใช้เรียงลำดับ
+  DateTimeColumn get favoritedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+// ----------------------------------------------------------------------
+// 2. ตารางเก็บร่างประกาศขายสินค้าจาก AI (ListingDrafts)
+// ----------------------------------------------------------------------
+class ListingDrafts extends Table {
+  // Primary key แบบ Auto Increment สำหรับจัดการร่างแต่ละชิ้น
+  IntColumn get id => integer().autoIncrement()();
+
+  // ข้อมูลที่ AI สร้างให้ (เปิด nullable ไว้ เพราะ AI หรือผู้ใช้อาจจะยังกรอกไม่ครบ)
+  TextColumn get title => text().nullable()();
+  TextColumn get category => text().nullable()();
+  TextColumn get description => text().nullable()();
+
+  // Path ของรูปภาพในเครื่อง (Local Storage Path)
+  TextColumn get imagePath => text()();
+
+  // เวลาที่แก้ไขล่าสุด
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
 ```
 
 
@@ -72,9 +110,12 @@
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+1.Gemini กำหนดให้ ListingDrafts ถูกต้อง (เป็น Auto-increment) แต่ตาราง FavoriteProducts ควรปรับมาใช้ id แบบ Auto-increment Integer เป็น Primary Key หลักตามบทเรียน แล้วแยก productId ออกมาต่างหาก
+2.Gemini เลือกใช้ RealColumn (ตรงกับ double ใน Dart) ซึ่งถูกต้องตรงตามบทเรียนแนะนำแล้ว
+3.Gemini แนะนำให้เก็บสำเนาข้อมูลไว้เลย (ไม่ได้ให้เก็บแค่ ID) ซึ่งถูกต้องตามหลัก Offline-first เพราะถ้าเก็บแค่ ID เมื่อไม่มีอินเทอร์เน็ต แอปจะไม่สามารถยิง API ไปดึงข้อมูลมาแสดงได้ ทำให้หน้า Favorites กลายเป็นหน้าว่างเปล่า
+4.Gemini ไม่ได้ใส่ .unique() ไว้ที่ productId (ใช้วิธีตั้งเป็น Primary Key แทน) ดังนั้นหากเปลี่ยน Primary Key เป็น id ตามข้อ 1 เราจำเป็นต้องใส่ .unique() ที่ productId เอง เพื่อไม่ให้ผู้ใช้กดหัวใจซ้ำจนข้อมูลขยะสะสม
 ```
-
+![alt text](images/image.png)
 ---
 
 ## ส่วนที่ 2: ติดตั้ง Drift และประกาศตาราง
@@ -171,10 +212,57 @@ dart run build_runner build --delete-conflicting-outputs
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:provider/provider.dart';
 
+import 'database/app_database.dart';
+import 'models/cart_model.dart';
+import 'repositories/favorites_repository_drift.dart'; // import เตรียมไว้สำหรับส่วนที่ 4
+import 'repositories/item_repository_api.dart';
+import 'repositories/listing_draft_repository_drift.dart'; // import เตรียมไว้สำหรับส่วนที่ 5
+import 'screens/main_scaffold.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await dotenv.load(fileName: ".env");
+
+  // 1. สร้าง AppDatabase ขึ้นมาเพียง 1 ตัวอินสแตนซ์ (Dependency Injection)
+  final db = AppDatabase();
+
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => CartModel(),
+      // 2. ส่ง db เข้าไปใน MyApp
+      child: MyApp(database: db),
+    ),
+  );
+}
+
+class MyApp extends StatelessWidget {
+  // เพิ่ม field สำหรับรับ AppDatabase
+  final AppDatabase database;
+
+  const MyApp({super.key, required this.database});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Campus Marketplace',
+      debugShowCheckedModeBanner: false,
+      home: MainScaffold(
+        itemRepository: ItemRepositoryApi(),
+        // 3. ส่ง Repository ทั้งสองตัวที่สร้างจาก AppDatabase ตัวเดียวกันเข้าไป
+        favoritesRepository: FavoritesRepositoryDrift(database),
+        draftRepository: ListingDraftRepositoryDrift(database),
+      ),
+    );
+  }
+}
+```
+![alt text](images/image1.png)
 ---
 
 ## ส่วนที่ 4: สร้างฟีเจอร์ "รายการโปรด" (Favorites) ตั้งแต่ต้น
@@ -298,9 +386,11 @@ items: const [
 
 > ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ: (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+ผลลัพย์ ข 
+![alt text](images/image2.png)
+
+ผลลัพย์ ค
+![alt text](images/image3.png)
 
 ---
 
@@ -348,10 +438,8 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว 
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
 
+![alt text](images/image4.png)
 ---
 
 ## ส่วนที่ 6: ทดสอบสถานการณ์ Offline-first
@@ -365,7 +453,8 @@ class SellItemPage extends StatefulWidget {
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
-
+![alt text](images/image5.png)
+![alt text](images/image6.png)
 ---
 
 ## ปัญหาที่พบบ่อยและวิธีแก้ไข (Troubleshooting)
