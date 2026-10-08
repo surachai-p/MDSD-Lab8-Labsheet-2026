@@ -55,8 +55,52 @@
 
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
-```text
-บันทึกผลลัพธ์ที่นี่
+
+1. ตารางสินค้าที่กดถูกใจ — FavoriteProducts
+```
+import 'package:drift/drift.dart';
+
+class FavoriteProducts extends Table {
+  // id สินค้าจาก API
+  IntColumn get productId => integer()();
+
+  // ข้อมูลที่เก็บไว้เพื่อแสดงผลโดยไม่ต้องเรียก API
+  TextColumn get name => text()();
+
+  // ราคาสินค้า
+  RealColumn get price => real()();
+
+  // URL ของรูปภาพสินค้า
+  TextColumn get imageUrl => text()();
+
+  // เวลาที่กดถูกใจล่าสุด
+  DateTimeColumn get likedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+```
+2. ตารางร่างประกาศขาย — SaleDrafts
+```
+class SaleDrafts extends Table {
+  // รหัสของร่างประกาศแต่ละรายการ
+  IntColumn get id => integer().autoIncrement()();
+
+  // ชื่อประกาศ
+  TextColumn get title => text()();
+
+  // หมวดหมู่สินค้า
+  TextColumn get category => text()();
+
+  // คำบรรยายสินค้า
+  TextColumn get description => text()();
+
+  // Path ของรูปภาพที่อยู่ในเครื่อง
+  TextColumn get imagePath => text()();
+
+  // เวลาที่แก้ไขล่าสุด
+  DateTimeColumn get updatedAt => dateTime()();
+}
 ```
 
 
@@ -71,9 +115,18 @@
 
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="1792" height="1120" alt="Screenshot 2569-10-08 at 13 09 59" src="https://github.com/user-attachments/assets/6ff541e2-d1d4-49ff-8e11-8ea732fbee2a" />
+<img width="1792" height="1120" alt="Screenshot 2569-10-08 at 13 10 08" src="https://github.com/user-attachments/assets/28d561b6-bb3c-4085-afac-b50c3055d4fa" />
+
+1. การกำหนด Primary Key
+การวิเคราะห์: Gemini กำหนดให้แต่ละตารางมีคอลัมน์ id เป็น Primary Key โดยใช้ชนิดข้อมูล Integer และมีคุณสมบัติ autoIncrement() ซึ่งถูกต้องและตรงตามหลักการในบทเรียนหัวข้อ 8.3 ที่ต้องการให้ฐานข้อมูลมีการจัดการ Key อัตโนมัติเพื่อความเป็นระเบียบและลดความผิดพลาดในการระบุแถวข้อมูล
+2. ชนิดข้อมูลของราคาสินค้า
+การวิเคราะห์: Gemini เลือกใช้ RealColumn (ในโค้ดคือ real()) สำหรับเก็บราคาสินค้า ซึ่งตรงกับคำแนะนำในบทเรียนที่ให้ใช้ RealColumn/double เพื่อรองรับค่าที่เป็นทศนิยมได้อย่างถูกต้องและแม่นยำ ไม่จำเป็นต้องแก้ไขใด ๆ
+3. การเก็บข้อมูลในตาราง Favorites (Offline-first)
+การวิเคราะห์: Gemini เสนอให้เก็บ "สำเนาข้อมูล" (ชื่อ, ราคา, รูปภาพ) ลงในตาราง FavoriteItems โดยตรง แทนการเก็บแค่ itemId แล้วไปเรียก API ใหม่
+เหตุผลตามหลักการ Offline-first (หัวข้อ 8.6): แนวทางของ Gemini นั้นถูกต้องและเหมาะสมมาก เพราะหากเราเลือกเก็บแค่ itemId แล้วใช้วิธีเรียก API ทุกครั้ง จะทำให้ผู้ใช้ไม่สามารถดูรายการโปรดได้เลยในจังหวะที่ไม่มีอินเทอร์เน็ต (Offline) การเก็บสำเนาข้อมูลไว้ในเครื่อง (Local Cache) จึงเป็นหัวใจสำคัญของ Offline-first เพื่อให้แอปพลิเคชันยังคงแสดงผลข้อมูลให้ผู้ใช้เห็นได้ทันทีแม้ในสถานการณ์ที่ไม่สามารถเชื่อมต่อเครือข่ายได้
+4. การป้องกันข้อมูลซ้ำ (Unique Constraint)
+การวิเคราะห์: ในข้อเสนอของ Gemini ได้มีการระบุ .unique() ให้กับคอลัมน์ itemId ไว้ตั้งแต่แรกแล้ว ซึ่งถือว่าทำได้ดีมากครับ เพราะการกำหนดเงื่อนไขนี้ช่วยป้องกันไม่ให้เกิดข้อมูลซ้ำซ้อนในตาราง Favorites (กรณีผู้ใช้กดถูกใจสินค้าชิ้นเดิมหลายครั้ง) ช่วยให้ฐานข้อมูลสะอาดและไม่ต้องเขียน Logic เพิ่มเติมในฝั่ง Code เพื่อตรวจสอบซ้ำอีกชั้นหนึ่ง
 
 ---
 
@@ -170,9 +223,11 @@ dart run build_runner build --delete-conflicting-outputs
 > ✅ **Checkpoint 3.1**
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
+ขั้นตอนที่ 3.2
+<img width="1792" height="1120" alt="image" src="https://github.com/user-attachments/assets/417913e8-3410-452e-8d4a-e6ba2df76e2a" />
+ขั้นตอนที่ 3.3
+<img width="1792" height="1120" alt="image" src="https://github.com/user-attachments/assets/536c4389-0f0f-42d6-b7d9-4e0f99f1d8dc" />
 
-```text
-บันทึกผลลัพธ์ที่นี่
 ```
 
 ---
