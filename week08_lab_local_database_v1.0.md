@@ -56,7 +56,94 @@
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+นี่คือโค้ด Dart สำหรับการออกแบบทั้งสองตารางด้วย Drift
+พร้อมคำอธิบายชนิดข้อมูลและเหตุผลประกอบครับ
+
+1. ตาราง FavoriteProducts (เก็บรายการสินค้าที่ถูกใจ)
+
+ตารางนี้ทำหน้าที่เป็น Local Cache ย่อมๆ ช่วยให้แสดงหน้า "รายการโปรด" ได้ทันทีแบบ
+Offline โดยไม่ต้องรอโหลดจากเซิร์ฟเวอร์
+
+import 'package:drift/drift.dart';
+
+class FavoriteProducts extends Table {
+  // รหัสสินค้าจาก Backend
+  IntColumn get productId => integer()();
+
+  // ข้อมูลพื้นฐานสำหรับแสดงผลทันที (Cache)
+  TextColumn get name => text()();
+  RealColumn get price => real()();
+  TextColumn get imageUrl => text().nullable()();
+
+  // เวลาที่กดถูกใจ เพื่อใช้เรียงลำดับ
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+
+  // กำหนดให้ productId เป็น Primary Key
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+เหตุผลในการเลือกชนิดข้อมูล:
+
+  - productId (IntColumn): ใช้เป็น Primary Key ไปในตัว เพื่อป้องกันข้อมูลซ้ำ
+    (กดถูกใจซ้ำไม่ได้) และค้นหาได้รวดเร็ว เหมาะกับ ID ตัวเลขจาก API
+  - name (TextColumn): สำหรับเก็บชื่อสินค้า เป็น String มาตรฐาน
+  - price (RealColumn): ใช้เก็บทศนิยม (Floating-point) สำหรับราคา
+    เพื่อรองรับสินค้าที่มีเศษสตางค์หรือการคำนวณส่วนลด
+  - imageUrl (TextColumn + .nullable()): สำหรับเก็บ URL ของรูปภาพ
+    เผื่อกรณีสินค้าบางรายการไม่มีรูปภาพหรือ URL โหลดไม่สำเร็จจึงอนุญาตให้เป็น
+    null ได้
+  - likedAt (DateTimeColumn): ใช้เก็บวันเวลา Drift จะแปลงเป็น Timestamp ให้
+    และใส่ .withDefault(currentDateAndTime) เพื่อบันทึกเวลาปัจจุบันของ SQLite
+    อัตโนมัติ ทำให้เราสามารถสั่ง orderBy([(t) => OrderingTerm.desc(t.likedAt)])
+    เพื่อดูรายการที่เพิ่งกดล่าสุดได้ทันที
+
+2. ตาราง ListingDrafts (เก็บร่างประกาศสินค้าจาก AI)
+
+ตารางนี้เน้นความยืดหยุ่นสูง เพราะการเป็น "ร่าง (Draft)"
+ข้อมูลอาจจะยังกรอกไม่ครบถ้วนในตอนแรก
+
+class ListingDrafts extends Table {
+  // Primary key รันอัตโนมัติของเครื่อง Local
+  IntColumn get id => integer().autoIncrement()();
+
+  // ข้อมูลที่ AI ช่วย Generate (ยอมให้ว่างได้ เพราะผู้ใช้อาจจะยังไม่ตรวจทาน)
+  TextColumn get title => text().nullable()();
+  TextColumn get category => text().nullable()();
+  TextColumn get description => text().nullable()();
+
+  // ที่อยู่ของไฟล์รูปภาพในเครื่อง
+  TextColumn get localImagePath => text()();
+
+  // เวลาที่อัปเดตล่าสุด
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
+
+เหตุผลในการเลือกชนิดข้อมูล:
+
+  - id (IntColumn + .autoIncrement()): ในระดับ Local ควรมี Auto-increment ID
+    เป็นของตัวเอง เพื่อให้ผู้ใช้สามารถสร้างร่างประกาศไว้ได้หลายๆ ชิ้นพร้อมกัน
+  - title, category, description (TextColumn + .nullable()): เนื่องจากเป็นสถานะ
+    "ร่าง" AI อาจวิเคราะห์ได้ไม่ครบทุกส่วน หรือผู้ใช้อาจลบข้อความออกระหว่างแก้ไข
+    จึงต้องยอมให้ค่าเป็น null ได้ เพื่อไม่ให้เกิด Error ตอนบันทึก
+  - localImagePath (TextColumn): เก็บ String ที่เป็น Path อ้างอิงไฟล์ในเครื่อง
+    (เช่น /data/user/0/.../image.jpg) คอลัมน์นี้ ไม่ใส่ nullable
+    เพราะโจทย์ระบุว่าร่างนี้ แนะนำจากรูปภาพ
+    ดังนั้นรูปภาพจึงเป็นจุดตั้งต้นที่จำเป็นต้องมีเสมอ
+  - updatedAt (DateTimeColumn): บันทึกวันเวลาที่แก้ไขล่าสุด โดยตอน Insert
+    จะได้เวลาปัจจุบันอัตโนมัติ และเมื่อมีการอัปเดตเนื้อหา
+    ให้เขียนโค้ดอัปเดตค่านี้เป็น DateTime.now()
+    เพื่อใช้จัดเรียงร่างที่แก้ไขล่าสุดขึ้นมาแสดงก่อน
+
+คำแนะนำเพิ่มเติมสำหรับการนำไปใช้งาน:
+
+1.  สำหรับตาราง FavoriteProducts หากมีรายการโปรดจำนวนมาก (หลักร้อยขึ้นไป)
+    แนะนำให้สร้าง Index ที่คอลัมน์ likedAt เพื่อให้ Query
+    ดึงข้อมูลมาเรียงตามเวลาได้เร็วขึ้น
+2.  สำหรับ localImagePath ควรระวังเรื่องรูปภาพต้นฉบับถูกผู้ใช้ลบออกจากเครื่อง
+    (เช่น ลบจาก Gallery) ใน UI ควรมี Placeholder เตรียมไว้รองรับกรณีหาไฟล์ตาม
+    Path ไม่เจอด้วยครับ
+
 ```
 
 
@@ -72,7 +159,10 @@
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+1. ตาราง ListingDrafts ใช้ id แบบ integer ที่ autoIncrement ถูกต้องตามบทเรียน แต่ตาราง FavoriteProducts ไม่ตรง เพราะ Gemini ใช้ productId เป็น Primary Key เองผ่าน primaryKey แทนที่จะมี id รันเลขอัตโนมัติ บทเรียนให้ทุกตารางมี id ของตัวเอที่ฐานข้อมูลสร้างให้ ไม่ผูก key กับรหัสจาก API แก้โดยเพิ่ม id แบบ autoIncrement แล้วเอา primaryKey ที่ผูกกับ productId ออก
+2. ราคา Gemini เลือก RealColumn ตรงกับบทเรียนอยู่แล้ว เหตุผลที่ให้มาก็ถูก คือราคามีทศนิยม ถ้าใช้ integer เศษจะหาย จึงไม่ต้องแก้
+3. Gemini เก็บสำเนา name, price และ imageUrl ไว้ในตารางเลย และบอกเองว่าเป็น Local Cache เพื่อแสดงหน้ารายการโปรดตอนออฟไลน์ ตรงกับหลัก Offline-first หัวข้อ ถ้าเก็บแค่รหัสสินค้าแล้วไปเรียก API ใหม่ทุกครั้ง พอไมมีอินเทอร์เน็ตก็ดึงข้อมูลมาแสดงไม่ได้ หน้านี้จะว่างหรือขึ้น error ทั้งที่ผู้ใช้เคยกดถูกใจไว้แล้ว
+4. Gemini ไม่ได้เขียน unique ไว้เลย ที่กดซ้ำไม่ได้เพราะ productId เป็น Primary Key อยู่ แต่พอแก้ข้อ 1 ให้มี id autoIncrement แล้ว การป้องกันนี้จะหายไป จึงต้องเพิ่ม unique ที่คอลัมน์รหัสสินค้าเอง ไม่งั้นผู้ใช กดหัวใจสินค้าชิ้นเดิมกี่ครั้งก็ได้ แถวซ้ำจะสะสมไปเรื่อยๆ
 ```
 
 ---
@@ -171,9 +261,10 @@ dart run build_runner build --delete-conflicting-outputs
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="1061" height="307" alt="image" src="https://github.com/user-attachments/assets/859fa813-7c06-4e50-a19a-56a06dbdffe3" />
+
+<img width="651" height="747" alt="image" src="https://github.com/user-attachments/assets/deb2bc3c-0dfc-4a6c-b350-b217122d994c" />
+
 
 ---
 
@@ -298,9 +389,25 @@ items: const [
 
 > ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ: (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+## ก
+<img width="659" height="912" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 20 48 02" src="https://github.com/user-attachments/assets/051760ba-cb24-4f63-80cb-9da2a5339cd1" />
+
+## ข
+<img width="659" height="912" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 20 48 45" src="https://github.com/user-attachments/assets/2c237253-56cf-45c1-ba9e-35e6d3d5b4d2" />
+
+## ค
+<img width="659" height="912" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 20 49 56" src="https://github.com/user-attachments/assets/ce2a47e0-4c3a-4560-a798-73e62339d8e1" />
+<img width="659" height="912" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 20 50 28" src="https://github.com/user-attachments/assets/8e99687a-bf00-4d11-abcb-7beb7843f8a2" />
+
+## ลบ 1 item
+<img width="659" height="912" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 20 51 54" src="https://github.com/user-attachments/assets/e24bea9d-c09a-4a47-804c-f70797d9ecdc" />
+<img width="659" height="912" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 20 52 29" src="https://github.com/user-attachments/assets/7d02f08c-a1ad-452f-83e9-6199d2ac08eb" />
+<img width="659" height="912" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 20 52 45" src="https://github.com/user-attachments/assets/8e267651-a2bc-42c6-97c3-ee87361d9049" />
+
+## ง
+<img width="659" height="912" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 20 53 18" src="https://github.com/user-attachments/assets/732cfb31-bebc-4685-a7be-f0903b6cce15" />
+<img width="659" height="912" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 20 53 43" src="https://github.com/user-attachments/assets/c173e48e-a89a-4f72-b11f-0249016659a0" />
+
 
 ---
 
@@ -348,9 +455,18 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว 
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+# 1
+<img width="659" height="912" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 21 07 22" src="https://github.com/user-attachments/assets/ce6bd20b-d91a-4011-b3dc-709cac52afe2" />
+
+# 2
+<img width="659" height="912" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 21 07 24" src="https://github.com/user-attachments/assets/fda5c0d5-909c-4010-b3b3-bcb7464f190d" />
+
+# 3
+<img width="659" height="912" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 21 07 28" src="https://github.com/user-attachments/assets/e93708d7-9d67-433f-87c9-1dcaa20f1660" />
+
+# 4
+<img width="659" height="912" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 21 08 19" src="https://github.com/user-attachments/assets/d6270da0-676c-4548-9019-da556cc4ab0b" />
+<img width="659" height="912" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 21 08 25" src="https://github.com/user-attachments/assets/8b64f08b-2cb4-42cf-ade5-4b8257285812" />
 
 ---
 
@@ -362,9 +478,14 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 6.1** ถ่ายภาพหน้าจอที่แสดงให้เห็นว่า Tab รายการโปรดและหน้าร่างประกาศยังคงแสดงข้อมูลได้ตามปกติแม้ไม่มีอินเทอร์เน็ตเลย (ส่วน Tab หน้าหลักที่ดึงจาก Fake Store API คาดว่าจะแสดง Error ตามปกติ เพราะยังไม่ได้ทำ Local Cache ให้หน้านั้น) 
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="513" height="210" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 21 15 50" src="https://github.com/user-attachments/assets/45d30ce5-eac9-4597-86fe-2b1af87b0ddd" />
+
+<img width="566" height="834" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 21 17 46" src="https://github.com/user-attachments/assets/1efed05b-c341-4a92-8b08-d2cfb3a86504" />
+
+<img width="571" height="833" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 21 17 59" src="https://github.com/user-attachments/assets/8fc937c8-6806-4401-9e3b-4c435adfb530" />
+
+<img width="568" height="827" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 21 18 14" src="https://github.com/user-attachments/assets/4f066600-cd15-4ce3-8867-fec4b419654d" />
+
 
 ---
 
