@@ -56,7 +56,108 @@
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+import 'package:drift/drift.dart';
+
+// =========================================================================
+// 1. ตาราง FavoriteProducts (เก็บรายการสินค้าที่ถูกใจ)
+// =========================================================================
+class FavoriteProducts extends Table {
+  /// รหัสสินค้าจากระบบหลัก/Backend (ตัวเลข)
+  /// ใช้เป็น Primary Key เพื่อป้องกันไม่ให้ผู้ใช้กดถูกใจสินค้าเดิมซ้ำในฐานข้อมูล
+  IntColumn get productId => integer()();
+
+  /// แคชชื่อสินค้าไว้ เพื่อให้แสดงผลในหน้ารายการโปรดได้ทันทีแบบออฟไลน์
+  TextColumn get title => text()();
+
+  /// แคชราคาสินค้า เป็นเลขทศนิยมสำหรับคำนวณและฟอร์แมตแสดงผล
+  RealColumn get price => real()();
+
+  /// แคช URL ของรูปภาพสินค้า สำหรับนำไปแสดงผลผ่าน CachedNetworkImage
+  TextColumn get imageUrl => text()();
+
+  /// บันทึกวันและเวลาที่กดถูกใจ กำหนด default เป็นเวลาปัจจุบัน ณ ตอนบันทึก
+  /// ใช้สำหรับเรียงลำดับรายการโปรดล่าสุด (ORDER BY liked_at DESC)
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+// =========================================================================
+// 2. ตาราง AiDraftListings (เก็บบันทึกร่างประกาศขายที่ AI ช่วยแนะนำ)
+// =========================================================================
+class AiDraftListings extends Table {
+  /// รหัสประจำร่างประกาศในเครื่อง (Auto Increment Primary Key)
+  IntColumn get id => integer().autoIncrement()();
+
+  /// ชื่อประกาศที่ AI สร้างให้ หรือผู้ใช้พิมพ์ปรับแต่ง (nullable ได้ เผื่อร่างเริ่มต้นยังไม่ได้ตั้งชื่อ)
+  TextColumn get title => text().nullable()();
+
+  /// หมวดหมู่สินค้า เช่น 'อุปกรณ์การเรียน', 'เครื่องแต่งกาย', 'ไอที'
+  TextColumn get category => text().nullable()();
+
+  /// คำบรรยายรายละเอียดสินค้าที่ AI ช่วยร่างให้
+  TextColumn get description => text().nullable()();
+
+  /// Path ที่เก็บไฟล์รูปภาพไว้ในเครื่อง (Local Storage Path)
+  /// เช่น '/data/user/0/.../app_flutter/drafts/img_01.jpg'
+  TextColumn get localImagePath => text()();
+
+  /// ราคาที่ AI แนะนำเบื้องต้น (Optional เผื่อโมเดล AI ประเมินราคาจากภาพให้)
+  RealColumn get suggestedPrice => real().nullable()();
+
+  /// วันเวลาที่บันทึกร่างประกาศครั้งแรก
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  /// วันเวลาที่แก้ไขร่างล่าสุด ใช้สำหรับจัดเรียงร่างที่ผู้ใช้เพิ่งเปิดแก้ไขล่าสุดขึ้นมาก่อน
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
+
+import 'dart:io';
+import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+import 'tables.dart';
+
+part 'app_database.g.dart';
+
+@DriftDatabase(tables: [FavoriteProducts, AiDraftListings])
+class AppDatabase extends _$AppDatabase {
+  AppDatabase() : super(_openConnection());
+
+  @override
+  int get schemaVersion => 1;
+
+  // 1. ดึงรายการถูกใจ เรียงตามเวลาที่ถูกใจล่าสุด
+  Stream<List<FavoriteProduct>> watchFavorites() {
+    return (select(favoriteProducts)
+          ..orderBy([(t) => OrderingTerm.desc(t.likedAt)]))
+        .watch();
+  }
+
+  // 2. ดึงร่างประกาศทั้งหมด เรียงตามเวลาแก้ไขล่าสุด
+  Stream<List<AiDraftListing>> watchDrafts() {
+    return (select(aiDraftListings)
+          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
+        .watch();
+  }
+
+  // 3. อัปเดตร่างพร้อมอัปเดตเวลา updatedAt เสมอ
+  Future<bool> updateDraftContent(int draftId, AiDraftListingsCompanion data) {
+    return (update(aiDraftListings)..where((t) => t.id.equals(draftId)))
+        .write(data.copyWith(updatedAt: Value(DateTime.now())))
+        .then((rows) => rows > 0);
+  }
+}
+
+LazyDatabase _openConnection() {
+  return LazyDatabase(() async {
+    final dbFolder = await getApplicationDocumentsDirectory();
+    final file = File(p.join(dbFolder.path, 'campus_marketplace.sqlite'));
+    return NativeDatabase.createInBackground(file);
+  });
+}
 ```
 
 
@@ -72,7 +173,17 @@
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+1. Primary Key
+ตาราง AiDraftListings ออกแบบถูกต้อง เพราะใช้ id เป็น Integer แบบ Auto-increment ส่วนตาราง FavoriteProducts ใช้ productId เป็น Primary Key โดยไม่ได้ตั้งค่า Auto-increment จึงควรปรับให้มี id เป็น Primary Key แบบ Auto-increment แล้วกำหนด productId เป็น .unique() แทน
+
+2. ชนิดข้อมูลราคา
+การที่ Gemini เลือกใช้ RealColumn สำหรับ price และ suggestedPrice ถือว่าถูกต้อง เพราะรองรับค่าทศนิยมได้ และตรงกับแนวทางที่บทเรียนแนะนำ
+
+3. การเก็บข้อมูล Favorites
+การเก็บ title, price และ imageUrl ไว้ในเครื่องเหมาะกับแนวคิด Offline-first เพราะผู้ใช้ยังดูรายการโปรดได้แม้ไม่มีอินเทอร์เน็ต หากเก็บเพียง productId แล้วต้องเรียก API ทุกครั้งที่แสดงผล แอปจะไม่สามารถแสดงข้อมูลได้เมื่อออฟไลน์
+
+4. productId ซ้ำกันได้หรือไม่
+ไม่ควรซ้ำกัน เพราะจะทำให้สินค้าชิ้นเดียวกันถูกบันทึกเป็นรายการโปรดหลายครั้ง ดังนั้นควรกำหนด productId.unique() เพื่อป้องกันข้อมูลซ้ำซ้อน
 ```
 
 ---
@@ -172,7 +283,9 @@ dart run build_runner build --delete-conflicting-outputs
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+PS D:\MDSD-Lab8-Labsheet-2026\campus_marketplace_w7> dart run build_runner build
+0s drift_dev on 56 inputs: 56 skipped                                                                                                                           
+0s source_gen:combining_builder on 28 inputs: 28 skipped
 ```
 
 ---
@@ -298,9 +411,11 @@ items: const [
 
 > ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ: (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+``text
+
+<img width="863" height="796" alt="image" src="https://github.com/user-attachments/assets/0e49dc78-df1d-4890-bd31-4a17caeccbf7" />
+
+``
 
 ---
 
@@ -348,9 +463,11 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว 
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+``text
+<img width="725" height="508" alt="image" src="https://github.com/user-attachments/assets/6fd73054-0414-465c-9662-6b8d7cd2134b" />
+<img width="1028" height="238" alt="image" src="https://github.com/user-attachments/assets/47febe56-bd48-4ed4-b2c7-2dc853d682e9" />
+
+``
 
 ---
 
