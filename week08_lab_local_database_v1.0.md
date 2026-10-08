@@ -55,10 +55,196 @@
 
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
-```text
 บันทึกผลลัพธ์ที่นี่
-```
 
+import 'package:drift/drift.dart';
+
+/// ตารางที่ 1: รายการสินค้าที่ผู้ใช้กดถูกใจ (FavoriteProducts)
+/// ออกแบบสำหรับแคชข้อมูลสินค้าไว้แสดงผลแบบ Offline โดยไม่ต้องเรียก API ซ้ำ
+@DataClassName('FavoriteProduct')
+class FavoriteProducts extends Table {
+  // 1. รหัสสินค้าจากระบบ API/Backend (Primary Key ห้ามซ้ำ)
+  IntColumn get productId => integer()();
+
+  // 2. ชื่อสินค้า สำหรับนำมาเรนเดอร์ใน UI หน้ารายการโปรดได้ทันที
+  TextColumn get title => text().withLength(min: 1, max: 255)();
+
+  // 3. ราคาสินค้า ใช้ real() รองรับทศนิยม เช่น 199.50 บาท
+  RealColumn get price => real()();
+
+  // 4. URL รูปภาพหน้าปกสินค้า (nullable เผื่อสินค้าบางรายการยังไม่มีรูป)
+  TextColumn get imageUrl => text().nullable()();
+
+  // 5. วัน-เวลาที่กดถูกใจ กำหนด default เป็นเวลาปัจจุบัน ใช้สำหรับ ORDER BY likedAt DESC
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+
+  // กำหนดให้ productId เป็น Primary Key เพื่อป้องกันรายการซ้ำ
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+import 'package:drift/drift.dart';
+
+/// ตารางที่ 2: ร่างประกาศขายสินค้าที่ AI ช่วยแนะนำ (ListingDrafts)
+/// ออกแบบสำหรับบันทึกข้อมูลแบบ Local Persistence ไม่ให้หายเมื่อปิดแอป
+@DataClassName('ListingDraft')
+class ListingDrafts extends Table {
+  // 1. รหัส Primary Key ของร่างในเครื่อง รันเลขอัตโนมัติ (1, 2, 3, ...)
+  IntColumn get id => integer().autoIncrement()();
+
+  // 2. ชื่อประกาศขายสินค้าที่ AI ช่วยตั้ง หรือผู้ใช้แก้ไขเพิ่มเติม
+  TextColumn get title => text().nullable()();
+
+  // 3. หมวดหมู่สินค้า เช่น 'หนังสือ/ชีทเรียน', 'อุปกรณ์ไอที', 'เสื้อผ้า'
+  TextColumn get category => text().nullable()();
+
+  // 4. คำบรรยายรายละเอียดสินค้าที่ AI ช่วยร่างจากภาพ
+  TextColumn get description => text().nullable()();
+
+  // 5. Path ของไฟล์รูปภาพในเครื่อง (Local Storage Path เช่น /data/user/0/...)
+  TextColumn get imagePath => text().nullable()();
+
+  // 6. เวลาที่แก้ไขล่าสุด ใช้สำหรับจัดเรียงร่างที่เพิ่งแก้ไขขึ้นมาบนสุด
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  // 7. เวลาที่ร่างถูกสร้างขึ้นครั้งแรก
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+}
+
+
+import 'dart:io';
+import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+
+part 'app_database.g.dart';
+
+// กำหนดตารางทั้งหมดใน Database
+@DriftDatabase(tables: [FavoriteProducts, ListingDrafts])
+class AppDatabase extends _$AppDatabase {
+  AppDatabase() : super(_openConnection());
+
+  @override
+  int get schemaVersion => 1;
+
+  // ==========================================
+  // Queries สำหรับ FavoriteProducts (สินค้าที่ถูกใจ)
+  // ==========================================
+
+  /// ดึงรายการสินค้าโปรดทั้งหมด เรียงจากถูกใจล่าสุดไปเก่าสุด (DESC)
+  Stream<List<FavoriteProduct>> watchFavoritesSortedByRecent() {
+    return (select(favoriteProducts)
+          ..orderBy([(t) => OrderingTerm.desc(t.likedAt)]))
+        .watch();
+  }
+
+  /// บันทึกหรืออัปเดตการถูกใจ (ถ้ามีอยู่แล้วจะอัปเดตเวลา likedAt ล่าสุด)
+  Future<void> saveFavorite({
+    required int productId,
+    required String title,
+    required double price,
+    String? imageUrl,
+  }) {
+    return into(favoriteProducts).insertOnConflictUpdate(
+      FavoriteProductsCompanion(
+        productId: Value(productId),
+        title: Value(title),
+        price: Value(price),
+        imageUrl: Value(imageUrl),
+        likedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  /// ตรวจสอบว่าสินค้า id นี้ถูกใจอยู่หรือไม่
+  Future<bool> isProductFavorited(int productId) async {
+    final item = await (select(favoriteProducts)
+          ..where((t) => t.productId.equals(productId)))
+        .getSingleOrNull();
+    return item != null;
+  }
+
+  /// ลบสินค้าออกจากรายการถูกใจ (Unlike)
+  Future<int> removeFavorite(int productId) {
+    return (delete(favoriteProducts)
+          ..where((t) => t.productId.equals(productId)))
+        .go();
+  }
+
+  // ==========================================
+  // Queries สำหรับ ListingDrafts (ร่างประกาศจาก AI)
+  // ==========================================
+
+  /// ดึงร่างประกาศทั้งหมด เรียงตามเวลาแก้ไขล่าสุด (DESC)
+  Stream<List<ListingDraft>> watchDraftsSortedByUpdated() {
+    return (select(listingDrafts)
+          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
+        .watch();
+  }
+
+  /// บันทึกร่างประกาศใหม่ที่ AI สร้างขึ้น
+  Future<int> insertAiDraft({
+    String? title,
+    String? category,
+    String? description,
+    String? imagePath,
+  }) {
+    return into(listingDrafts).insert(
+      ListingDraftsCompanion.insert(
+        title: Value(title),
+        category: Value(category),
+        description: Value(description),
+        imagePath: Value(imagePath),
+      ),
+    );
+  }
+
+  /// บันทึกการแก้ไขร่างเดิม พร้อมอัปเดตเวลา updatedAt เป็นเวลาปัจจุบัน
+  Future<bool> updateExistingDraft({
+    required int id,
+    String? title,
+    String? category,
+    String? description,
+    String? imagePath,
+  }) {
+    return update(listingDrafts).replace(
+      ListingDraft(
+        id: id,
+        title: title,
+        category: category,
+        description: description,
+        imagePath: imagePath,
+        updatedAt: DateTime.now(),
+        createdAt: DateTime.now(), // หรือเก็บ createdAt เดิมไว้
+      ),
+    );
+  }
+
+  /// ลบร่างประกาศเมื่อโพสต์ขายสำเร็จ หรือเมื่อผู้ใช้กดยกเลิก
+  Future<int> deleteDraft(int id) {
+    return (delete(listingDrafts)..where((t) => t.id.equals(id))).go();
+  }
+}
+
+/// ฟังก์ชันเปิดการเชื่อมต่อฐานข้อมูล SQLite บนเครื่องผู้ใช้
+LazyDatabase _openConnection() {
+  return LazyDatabase(() async {
+    final dbFolder = await getApplicationDocumentsDirectory();
+    final file = File(p.join(dbFolder.path, 'campus_marketplace.sqlite'));
+    return NativeDatabase.createInBackground(file);
+  });
+}
+
+
+ภาพ 
+<img width="1470" height="780" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 20 45 00" src="https://github.com/user-attachments/assets/d924dc31-ae14-4815-bd3b-ba0e26b796ee" />
+<img width="1470" height="785" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 20 45 09" src="https://github.com/user-attachments/assets/8ac68b42-5c28-4f46-bdae-280e8a4fa512" />
+<img width="1470" height="785" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 20 45 09" src="https://github.com/user-attachments/assets/f68691a5-6621-4b0d-a753-74d50e16d62c" />
+<img width="1470" height="784" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 20 45 20" src="https://github.com/user-attachments/assets/da7d9830-c3f7-457c-bfa8-003a49d6494d" />
+<img width="1470" height="785" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 20 45 29" src="https://github.com/user-attachments/assets/1f94db84-9913-4b1e-ba2d-2053d9643261" />
+<img width="1470" height="785" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 20 45 39" src="https://github.com/user-attachments/assets/b800f5f5-e7b6-49a8-b0b0-933a33dda9c8" />
+<img width="1470" height="784" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 20 45 47" src="https://github.com/user-attachments/assets/2f2ce54b-bcc4-4256-92c8-f2859f881cba" />
 
 ### ขั้นตอนที่ 1.2: ตรวจสอบและเทียบกับหลักการในบทเรียน 🧠 คิดเอง
 
@@ -71,10 +257,18 @@
 
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
-```text
 บันทึกผลลัพธ์ที่นี่
-```
+<img width="622" height="702" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 21 10 05" src="https://github.com/user-attachments/assets/563da5c4-94c3-45ae-9ea6-d0d019713b40" />
 
+```
+1.ถูกต้อง เพราะแต่ละแถวควรมี ID ที่ไม่ซ้ำกันและให้ระบบสร้างเลขให้อัตโนมัติ
+
+2.ใช้ RealColumn เพราะราคาสินค้าเป็นตัวเลขที่สามารถมีทศนิยมได้ และใน Dart จะตรงกับชนิด double จึงเหมาะกับการเก็บราคามากกว่า IntColumn
+
+3.เก็บข้อมูลที่จำเป็น เช่น itemId, ชื่อสินค้า, ราคา และรูปภาพไว้ในฐานข้อมูลด้วย ไม่ควรเก็บแค่ itemId แล้วเรียก API ใหม่ทุกครั้ง เพราะถ้าไม่มีอินเทอร์เน็ตจะไม่สามารถโหลดข้อมูลสินค้ามาแสดงได้ การเก็บข้อมูลไว้ใน Local Database จึงช่วยให้แอปยังแสดงรายการโปรดได้แม้ Offline
+
+4.ควรกำหนด itemId เป็น .unique() เพราะสินค้าหนึ่งชิ้นควรมีได้เพียงหนึ่งรายการใน Favorites ถ้าไม่กำหนด ผู้ใช้สามารถกดหัวใจสินค้าชิ้นเดิมซ้ำและทำให้เกิดข้อมูลซ้ำหลายแถวได้
+```
 ---
 
 ## ส่วนที่ 2: ติดตั้ง Drift และประกาศตาราง
@@ -151,7 +345,7 @@ dart run build_runner build --delete-conflicting-outputs
 
 สัปดาห์นี้ซับซ้อนกว่าเดิมเล็กน้อย เพราะ `main.dart` ต้องสร้าง `AppDatabase` ขึ้นมาหนึ่งอินสแตนซ์ แล้วส่งต่อให้ Repository **สองตัว** (Favorites และ Draft) ที่จะสร้างในส่วนที่ 4-5 ก่อนส่งเข้า `MainScaffold` อีกที ตรวจสอบตามโครงนี้แล้วเติมส่วนที่ยังไม่มี (Repository ทั้งสองตัวจะสร้างจริงในส่วนถัดไป ตอนนี้แค่เตรียมจุดเชื่อมไว้ก่อน)
 
-```
+```   
 ในฟังก์ชัน main():
     สร้าง AppDatabase() ขึ้นมา 1 ตัว เก็บไว้ในตัวแปร db
 
@@ -171,9 +365,11 @@ dart run build_runner build --delete-conflicting-outputs
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
 
-```text
 บันทึกผลลัพธ์ที่นี่
-```
+<img width="1466" height="952" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 22 26 31" src="https://github.com/user-attachments/assets/1dbd1a13-9899-42b9-bf90-05134e86d8cd" />
+
+<img width="1464" height="945" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 22 28 02" src="https://github.com/user-attachments/assets/5cbf3b48-0364-4dab-8739-8714e3d7bccf" />
+
 
 ---
 
@@ -298,9 +494,10 @@ items: const [
 
 > ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ: (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
 
-```text
 บันทึกผลลัพธ์ที่นี่
-```
+<img width="1470" height="956" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 23 48 15" src="https://github.com/user-attachments/assets/3cf8c82b-6446-4563-965d-6e6c60761ad3" />
+<img width="1470" height="956" alt="ภาพถ่ายหน้าจอ 2569-10-08 เวลา 23 48 44" src="https://github.com/user-attachments/assets/e27b78b7-6c04-46c9-92c3-fb13dc730fdc" />
+
 
 ---
 
@@ -348,9 +545,10 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว 
 
-```text
 บันทึกผลลัพธ์ที่นี่
-```
+<img width="1470" height="956" alt="ภาพถ่ายหน้าจอ 2569-10-09 เวลา 00 45 02" src="https://github.com/user-attachments/assets/5e32a87a-eae0-4a2b-9bfd-63ae1e8d64d7" />
+<img width="1470" height="956" alt="ภาพถ่ายหน้าจอ 2569-10-09 เวลา 01 38 41" src="https://github.com/user-attachments/assets/fc1621dd-3dd7-4fc3-851f-892d91141962" />
+
 
 ---
 
@@ -362,9 +560,12 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 6.1** ถ่ายภาพหน้าจอที่แสดงให้เห็นว่า Tab รายการโปรดและหน้าร่างประกาศยังคงแสดงข้อมูลได้ตามปกติแม้ไม่มีอินเทอร์เน็ตเลย (ส่วน Tab หน้าหลักที่ดึงจาก Fake Store API คาดว่าจะแสดง Error ตามปกติ เพราะยังไม่ได้ทำ Local Cache ให้หน้านั้น) 
 
-```text
 บันทึกผลลัพธ์ที่นี่
-```
+<img width="1470" height="956" alt="ภาพถ่ายหน้าจอ 2569-10-09 เวลา 01 48 02" src="https://github.com/user-attachments/assets/4b99dde8-37d2-4dd0-b254-bf2ec7c3b754" />
+<img width="1470" height="956" alt="ภาพถ่ายหน้าจอ 2569-10-09 เวลา 01 48 08" src="https://github.com/user-attachments/assets/414e6129-09f6-4c58-8303-9ad08e8b0de1" />
+<img width="1470" height="956" alt="ภาพถ่ายหน้าจอ 2569-10-09 เวลา 01 48 16" src="https://github.com/user-attachments/assets/8a5094de-bd4e-4556-a3ee-b3ca25e87479" />
+<img width="1470" height="956" alt="ภาพถ่ายหน้าจอ 2569-10-09 เวลา 01 48 20" src="https://github.com/user-attachments/assets/90401ae4-42bd-47d4-8dde-5768dc8bc694" />
+
 
 ---
 
