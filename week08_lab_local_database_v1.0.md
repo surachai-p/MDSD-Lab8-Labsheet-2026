@@ -56,6 +56,49 @@
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
 ```text
+import 'package:drift/drift.dart';
+
+/// 1. ตารางเก็บรายการสินค้าที่ผู้ใช้กดถูกใจ (FavoriteItems)
+class FavoriteItems extends Table {
+  // รหัสสินค้าจากระบบหลังบ้าน (API)
+  IntColumn get productId => integer()();
+
+  // ชื่อสินค้า (แคชไว้แสดงผลออฟไลน์)
+  TextColumn get title => text().withLength(min: 1, max: 200)();
+
+  // ราคาสินค้า
+  RealColumn get price => real()();
+
+  // URL หรือ Path รูปภาพของสินค้า
+  TextColumn get imageUrl => text()();
+
+  // วันและเวลาที่กดถูกใจ (ใช้สำหรับเรียงลำดับล่าสุด)
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+/// 2. ตารางเก็บร่างประกาศขายสินค้าที่ AI ช่วยแนะนำ (ListingDrafts)
+class ListingDrafts extends Table {
+  // รหัสของร่างประกาศในเครื่อง (Auto Increment)
+  IntColumn get id => integer().autoIncrement()();
+
+  // ชื่อประกาศ (nullable เผื่อกรณี AI ยังไม่ได้ตั้งหรือผู้ใช้ลบออกเพื่อพิมพ์ใหม่)
+  TextColumn get title => text().nullable()();
+
+  // หมวดหมู่สินค้า
+  TextColumn get category => text().nullable()();
+
+  // รายละเอียด/คำบรรยายสินค้า
+  TextColumn get description => text().nullable()();
+
+  // Path ของรูปภาพที่เก็บอยู่ในเครื่อง (Local File System)
+  TextColumn get imagePath => text()();
+
+  // วันและเวลาที่แก้ไขล่าสุด
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
 บันทึกผลลัพธ์ที่นี่
 ```
 
@@ -70,9 +113,37 @@
 - Gemini กำหนดให้คอลัมน์ที่อ้างอิงสินค้า (`itemId`) ห้ามมีค่าซ้ำกัน (`.unique()`) หรือไม่ ถ้าไม่ได้กำหนด ให้เพิ่มเอง เพราะถ้าไม่มีข้อบังคับนี้ ผู้ใช้กดหัวใจสินค้าชิ้นเดียวกันซ้ำได้ไม่จำกัด ทำให้ตาราง Favorites มีแถวซ้ำกันสะสมไปเรื่อย ๆ
 
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
-
+<img width="1099" height="843" alt="image" src="https://github.com/user-attachments/assets/ec53a48c-4b82-4a66-ae0e-23921363bb22" />
 ```text
-บันทึกผลลัพธ์ที่นี่
+1. Primary Key
+
+ตาราง ListingDrafts กำหนด Primary Key ได้ตรงตามหลักการในบทเรียน เพราะมีคอลัมน์ id เป็น Integer และใช้ autoIncrement()
+
+ส่วนตาราง FavoriteItems ใช้ productId เป็น Primary Key โดยตรง แม้วิธีนี้จะป้องกันสินค้าซ้ำได้ แต่ยังไม่ตรงกับรูปแบบที่บทเรียนกำหนดให้แต่ละตารางมี id แบบ Auto-increment Integer แยกต่างหาก จึงควรเพิ่มคอลัมน์
+
+IntColumn get id => integer().autoIncrement()();
+
+แล้วใช้ productId หรือเปลี่ยนชื่อเป็น itemId สำหรับเก็บรหัสสินค้าจาก API
+
+2. ชนิดข้อมูลของราคา
+
+Gemini กำหนดคอลัมน์ price เป็น RealColumn ด้วย real() ซึ่ง Drift จะแปลงเป็นข้อมูลชนิด double ใน Dart จึงตรงกับคำแนะนำในบทเรียน เหมาะกับราคาที่อาจมีทศนิยมและไม่ต้องแก้ไข
+
+3. การเก็บสำเนาข้อมูลสินค้าเพื่อรองรับ Offline-first
+
+Gemini เก็บทั้ง productId, title, price และ imageUrl ไว้ในตาราง FavoriteItems ไม่ได้เก็บเพียงรหัสสินค้าแล้วเรียก API ใหม่ทุกครั้ง แนวทางนี้เหมาะกับหลักการ Offline-first เพราะแอปยังสามารถแสดงชื่อ ราคา และรูปภาพอ้างอิงของรายการโปรดจากฐานข้อมูลในเครื่องได้ แม้ไม่มีอินเทอร์เน็ต
+
+หากเก็บเพียง productId ผู้ใช้จะไม่สามารถดูรายละเอียดสินค้าได้เมื่อออฟไลน์หรือเมื่อ API ขัดข้อง เพราะแอปต้องเชื่อมต่อ API เพื่อดึงข้อมูลใหม่ทุกครั้ง
+
+4. การป้องกัน itemId ซ้ำ
+
+Schema จาก Gemini ไม่ได้ใส่ .unique() ให้ productId โดยตรง แต่กำหนด productId เป็น Primary Key ซึ่งทำให้ค่าห้ามซ้ำอยู่แล้ว อย่างไรก็ตาม เมื่อปรับ Schema ให้มี id แบบ Auto-increment เป็น Primary Key ตามบทเรียน productId จะไม่ใช่ Primary Key อีกต่อไป จึงต้องเพิ่ม .unique() เพื่อป้องกันสินค้าชิ้นเดียวกันถูกบันทึกซ้ำหลายแถว
+
+ควรแก้เป็น
+
+IntColumn get id => integer().autoIncrement()();
+IntColumn get itemId => integer().unique()();
+
 ```
 
 ---
@@ -170,6 +241,7 @@ dart run build_runner build --delete-conflicting-outputs
 > ✅ **Checkpoint 3.1**
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
+<img width="1050" height="524" alt="image" src="https://github.com/user-attachments/assets/c6793648-db38-4060-90bf-d03e6c3e4aff" />
 
 ```text
 บันทึกผลลัพธ์ที่นี่
@@ -296,7 +368,24 @@ items: const [
 
 > ⚠️ `IndexedStack` อ้างอิง index ตามตำแหน่งใน List `pages` และ `BottomNavigationBarItem` ต้องมีจำนวนเท่ากับ `pages` เสมอ (ตอนนี้ต้องเป็น 3 ทั้งคู่) ถ้าจำนวนไม่ตรงกันแอปจะ Error ทันทีตอนรัน ไม่ใช่แค่แสดงผลผิด
 
-> ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ: (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
+> ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ:
+(ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home
+
+<img width="365" height="800" alt="image" src="https://github.com/user-attachments/assets/4c695319-64c3-4163-95a4-79bc32f875e4" />
+
+(ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น
+
+<img width="362" height="797" alt="image" src="https://github.com/user-attachments/assets/83c5b570-697a-4ec2-aeaf-271cf5b788db" />
+
+(ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน
+
+<img width="358" height="800" alt="image" src="https://github.com/user-attachments/assets/44b0abfc-9722-4f63-8544-77b898a73afa" />
+
+<img width="364" height="800" alt="image" src="https://github.com/user-attachments/assets/0110acb3-cad8-4047-9434-9604184afdf3" />
+
+(ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
+
+<img width="361" height="800" alt="image" src="https://github.com/user-attachments/assets/8680ea72-b0a4-4299-807d-61c14cb25ce0" />
 
 ```text
 บันทึกผลลัพธ์ที่นี่
@@ -347,6 +436,9 @@ class SellItemPage extends StatefulWidget {
 **ทำไมหน้านี้ไม่ใช่ Tab ที่ 4**: ตาม `campus_marketplace_lab_roadmap.md` หัวข้อ 2.1 มีกฎชัดเจนว่าอะไรควรเป็น Tab (ปลายทางหลักที่สลับไปมาตลอดเวลา) กับอะไรควรเป็น Push/Pop (Flow เฉพาะกิจที่มีจุดเริ่ม-จบ) "ร่างประกาศของฉัน" เป็นหน้าจัดการร่างที่ผูกกับ Flow การลงประกาศโดยตรง ไม่ใช่ปลายทางหลักที่ผู้ใช้เปิดดูตลอดเวลาเหมือน Favorites อีกทั้ง Roadmap ได้กำหนดไว้แล้วว่า Tab ที่ 4 ของแอปคือ "โปรไฟล์" ในสัปดาห์หน้า การเพิ่ม Tab ใหม่อีกตัวตอนนี้จะทำให้ลำดับ Tab ทั้งเทอมเพี้ยนไปจากแผน **จึงให้เข้าถึงหน้านี้ด้วยปุ่มไอคอนใน AppBar ของ Tab "ลงประกาศขาย" แทน** (เช่น `IconButton(icon: Icon(Icons.history), onPressed: () => Navigator.push(...))`) เพิ่ม `AppBar` ให้ `SellItemPage` ถ้ายังไม่มี แล้วใส่ปุ่มนี้ไว้ที่ `actions`
 
 > ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว 
+<img width="359" height="801" alt="image" src="https://github.com/user-attachments/assets/3495865d-3b67-4323-8881-373f2da0ec71" />
+<img width="335" height="180" alt="image" src="https://github.com/user-attachments/assets/146e67e0-ff40-4e61-afd3-ba07539420a5" />
+<img width="340" height="554" alt="image" src="https://github.com/user-attachments/assets/4a7eaf1a-8200-4a0f-83df-178bb5920167" />
 
 ```text
 บันทึกผลลัพธ์ที่นี่
@@ -361,6 +453,9 @@ class SellItemPage extends StatefulWidget {
 ปิด Wi-Fi และ Data บนอุปกรณ์ทดสอบ แล้วเปิดแอป `campus_marketplace_w7` เข้าไปที่ Tab "รายการโปรด" และหน้า "ร่างประกาศของฉัน"
 
 > ✅ **Checkpoint 6.1** ถ่ายภาพหน้าจอที่แสดงให้เห็นว่า Tab รายการโปรดและหน้าร่างประกาศยังคงแสดงข้อมูลได้ตามปกติแม้ไม่มีอินเทอร์เน็ตเลย (ส่วน Tab หน้าหลักที่ดึงจาก Fake Store API คาดว่าจะแสดง Error ตามปกติ เพราะยังไม่ได้ทำ Local Cache ให้หน้านั้น) 
+<img width="357" height="798" alt="image" src="https://github.com/user-attachments/assets/a1a00779-7344-4efb-b2e5-d9167307a1b8" />
+<img width="354" height="795" alt="image" src="https://github.com/user-attachments/assets/48eda061-63e1-473d-8980-51a88115112b" />
+<img width="335" height="185" alt="image" src="https://github.com/user-attachments/assets/2c574abb-218e-4064-adfb-ef8a84a379ff" />
 
 ```text
 บันทึกผลลัพธ์ที่นี่
