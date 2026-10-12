@@ -71,9 +71,100 @@
 
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
-```text
+``text
 บันทึกผลลัพธ์ที่นี่
-```
+<img width="1915" height="842" alt="image" src="https://github.com/user-attachments/assets/4a571c96-4e40-42d7-83df-35f42b96dd71" />
+<img width="1917" height="838" alt="image" src="https://github.com/user-attachments/assets/8c7b1e49-7a9a-4b1c-bff0-620776bab089" />
+<img width="1917" height="843" alt="image" src="https://github.com/user-attachments/assets/47742029-a660-4232-b2dc-f4ea20910545" />
+<img width="1903" height="857" alt="image" src="https://github.com/user-attachments/assets/95a14c43-4c52-4aab-9d98-ca03e25b6c44" />
+<img width="1917" height="835" alt="image" src="https://github.com/user-attachments/assets/af0c1bbe-8b96-4cb2-a30a-5392f43e5814" />
+<img width="1913" height="836" alt="image" src="https://github.com/user-attachments/assets/0884e3f7-1bed-4feb-9fea-966dfec9a8f2" />
+<img width="1917" height="847" alt="image" src="https://github.com/user-attachments/assets/42a89ed7-56dd-476a-88c0-330e2c95c149" />
+
+1. ตารางรายการสินค้าที่ผู้ใช้กดถูกใจเป็นครั้งแรก (LikedItems)
+โค้ด Dart (class LikedItems extends Table)
+import 'package:drift/drift.dart';
+
+/// ตารางที่ 1: เก็บรายการสินค้าที่ผู้ใช้กดถูกใจเป็นครั้งแรก (Offline-First Snapshot)
+@DataClassName('LikedItem')
+@TableIndex(name: 'idx_liked_items_liked_at', columns: {#likedAt})
+class LikedItems extends Table {
+  /// รหัสสินค้าอ้างอิงจากระบบ Backend (เป็นตัวเลข)
+  /// ใช้เป็น Primary Key เพื่อบังคับให้สินค้า 1 ชิ้นถูกบันทึกการกดถูกใจครั้งแรกได้เพียงแถวเดียว
+  IntColumn get productId => integer()();
+
+  /// ชื่อสินค้า ณ เวลาที่กดถูกใจ (Snapshot สำหรับแสดงผลโดยไม่ต้องเรียก API ซ้ำ)
+  TextColumn get title => text().withLength(min: 1, max: 255)();
+
+  /// ราคาสินค้า (รองรับทศนิยม เช่น 1250.50 บาท และห้ามติดลบ)
+  RealColumn get price => real().check(price.isBiggerOrEqualValue(0))();
+
+  /// URL หรือ Path ของรูปภาพปกสินค้า สำหรับแสดงผลทันทีจากแคช/เครื่อง
+  TextColumn get imageUrl => text()();
+
+  /// วันและเวลาที่ผู้ใช้กดถูกใจเป็นครั้งแรก (ใช้เรียงลำดับรายการที่ถูกใจล่าสุด)
+  DateTimeColumn get likedAt =>
+      dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+ชนิดข้อมูลและเหตุผลของแต่ละคอลัมน์ใน LikedItems
+productId — IntColumn (integer()) + กำหนดเป็น primaryKey
+เหตุผล: โจทย์ระบุว่าอ้างอิงจาก ID สินค้าที่เป็นตัวเลขและเก็บเมื่อกดถูกใจเป็นครั้งแรก การใช้ IntColumn (SQLite INTEGER 64-bit) และตั้งเป็น primaryKey โดยตรง (แทนการสร้าง autoIncrement แยก) จะบังคับในระดับฐานข้อมูลว่าสินค้า 1 ชิ้นมีได้เพียง 1 แถว เมื่อบันทึกด้วย InsertMode.insertOrIgnore จะช่วยป้องกันการบันทึกซ้ำและรักษาเวลา likedAt ที่กดถูกใจครั้งแรกไว้เสมอ
+title — TextColumn (text().withLength(min: 1, max: 255)())
+เหตุผล: ใช้เก็บชื่อสินค้าแบบ UTF-8 (TEXT) เพื่อทำ Denormalization (Snapshot) ให้หน้า Favorites แสดงชื่อสินค้าได้ทันทีโดยไม่ต้องเรียก API ซ้ำ พร้อมจำกัดความยาว 1..255 เพื่อป้องกันสตริงว่าง
+price — RealColumn (real().check(price.isBiggerOrEqualValue(0))())
+เหตุผล: แปลงเป็น double ในภาษา Dart และ REAL ใน SQLite เพื่อรองรับราคาสินค้าที่มีจุดทศนิยม (เช่น 180.50 บาท) พร้อมใส่ Constraint .check(...) ป้องกันค่าราคาติดลบ (หมายเหตุ: หากระบบกำหนดราคาเป็นหน่วยสตางค์หรือจำนวนเต็มบาทเท่านั้น สามารถเลือกใช้ IntColumn แทนได้)
+imageUrl — TextColumn (text()())
+เหตุผล: เก็บ URL ของรูปภาพ (หรือ Local Cached Path) เป็นข้อความแทนการใช้ BlobColumn เพราะการเก็บไฟล์รูปภาพดิบไว้ใน SQLite จะทำให้ฐานข้อมูลมีขนาดใหญ่และคิวรีช้า การเก็บเป็น TextColumn ร่วมกับ CachedNetworkImage ใน Flutter จะโหลดภาพจากแคชในเครื่องได้ทันทีโดยไม่ต้องยิง API ข้อมูลสินค้าซ้ำ
+likedAt — DateTimeColumn (dateTime().withDefault(currentDateAndTime)())
+เหตุผล: Drift จะจัดการแปลง DateTime ของ Dart ให้เป็น Timestamp ใน SQLite อัตโนมัติ มีความแม่นยำในการเรียงลำดับเวลา (ORDER BY liked_at DESC) มากกว่าการเก็บเป็นข้อความเอง และกำหนด @TableIndex ที่คอลัมน์นี้เพื่อให้การดึงรายการที่กดถูกใจล่าสุดทำงานได้รวดเร็ว
+
+
+2. ตารางเก็บร่างประกาศขายสินค้าที่ AI ช่วยแนะนำจากรูปภาพ (AiListingDrafts)
+<img width="610" height="867" alt="image" src="https://github.com/user-attachments/assets/6b139dc4-56e5-4e8c-b955-39cb1c5a7c50" />
+โค้ด Dart (class AiListingDrafts extends Table)
+import 'package:drift/drift.dart';
+
+/// ตารางที่ 2: เก็บร่างประกาศขายสินค้าที่ AI ช่วยแนะนำจากรูปภาพ (Local Persistent Drafts)
+@DataClassName('AiListingDraft')
+@TableIndex(name: 'idx_ai_drafts_updated_at', columns: {#updatedAt})
+class AiListingDrafts extends Table {
+  /// รหัสร่างประกาศภายในเครื่อง (Local Primary Key สร้างอัตโนมัติ)
+  /// เนื่องจากยังไม่ได้เผยแพร่ขึ้น Server จึงยังไม่มี Product ID จาก Backend
+  IntColumn get id => integer().autoIncrement()();
+
+  /// ชื่อประกาศขายสินค้าที่ AI แนะนำ หรือที่ผู้ใช้ปรับแก้เพิ่มเติม
+  TextColumn get title => text().withLength(min: 1, max: 200)();
+
+  /// หมวดหมู่สินค้าที่ AI จำแนกให้ (เช่น 'หนังสือเรียน', 'อุปกรณ์อิเล็กทรอนิกส์')
+  TextColumn get category => text().withLength(min: 1, max: 100)();
+
+  /// คำบรรยายรายละเอียดสภาพสินค้าและจุดเด่นที่ AI ร่างให้
+  TextColumn get description => text()();
+
+  /// Path ของไฟล์รูปภาพในเครื่อง (Local File Path เช่น /data/user/0/.../draft_1.jpg)
+  TextColumn get localImagePath => text()();
+
+  /// วันและเวลาที่แก้ไขร่างประกาศครั้งล่าสุด
+  DateTimeColumn get updatedAt =>
+      dateTime().withDefault(currentDateAndTime)();
+}
+ชนิดข้อมูลและเหตุผลของแต่ละคอลัมน์ใน AiListingDrafts
+id — IntColumn (integer().autoIncrement()())
+เหตุผล: เนื่องจากเป็น "ร่างประกาศ (Draft)" ที่เพิ่งสร้างในเครื่องและยังไม่ถูกส่งไปสร้างรหัสสินค้าจริงบน Server จึงต้องมี Local Surrogate Primary Key ที่สร้างตัวเลขอัตโนมัติ (AUTOINCREMENT) เพื่อให้ผู้ใช้สามารถสร้างร่างประกาศค้างไว้ได้หลายชิ้น และใช้อ้างอิงตอนสั่ง UPDATE หรือ DELETE เมื่อโพสต์ขายจริงเสร็จสิ้น
+title — TextColumn (text().withLength(min: 1, max: 200)())
+เหตุผล: เก็บหัวข้อประกาศขายที่ AI สร้างให้หรือที่ผู้ใช้แก้ไขเอง โดยจำกัดความยาวไม่เกิน 200 ตัวอักษรให้สอดคล้องกับขนาดหัวข้อประกาศของระบบ Marketplace
+category — TextColumn (text().withLength(min: 1, max: 100)())
+เหตุผล: เก็บหมวดหมู่ที่ AI แนะนำเป็นข้อความ (String) ซึ่งยืดหยุ่นเมื่อมีการเพิ่มหมวดหมู่ใหม่ในอนาคต (ทางเลือกเพิ่มเติม: หากมี enum Category ในโค้ด Dart อยู่แล้ว สามารถใช้ textEnum<Category>()() ของ Drift เพื่อแปลงเป็น Enum แบบ Type-safe ได้)
+description — TextColumn (text()())
+เหตุผล: คำบรรยายสินค้าที่ AI ร่างให้อาจมีความยาวหลายย่อหน้า การใช้ TextColumn โดยไม่บีบเพดานความยาวแคบเกินไปช่วยให้เก็บรายละเอียดสภาพสินค้าและจุดนัดรับในมหาวิทยาลัยได้อย่างครบถ้วน
+localImagePath — TextColumn (text()())
+เหตุผล: เก็บ Path ของไฟล์รูปภาพในเครื่อง (เช่น /data/user/0/.../app_flutter/drafts/img_01.jpg) แทนการเก็บไฟล์ภาพเป็น BlobColumn เพื่อไม่ให้ฐานข้อมูล SQLite บวม และสามารถนำไปแสดงผลใน UI ด้วย Image.file(File(draft.localImagePath)) ได้ทันที
+updatedAt — DateTimeColumn (dateTime().withDefault(currentDateAndTime)())
+เหตุผล: เก็บวันและเวลาที่สร้างหรือแก้ไขร่างประกาศครั้งล่าสุดเป็น DateTime ของ Dart ตอนสร้างครั้งแรกจะได้ค่า Default จาก currentDateAndTime และทุกครั้งที่ผู้ใช้แก้ไขร่างประกาศให้ส่ง updatedAt: Value(DateTime.now()) เพื่ออัปเดตเวลาและเรียงร่างที่แก้ไขล่าสุดไว้บนสุดเสมอ
+``
 
 ---
 
@@ -171,9 +262,13 @@ dart run build_runner build --delete-conflicting-outputs
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
 
-```text
+``text
 บันทึกผลลัพธ์ที่นี่
-```
+<img width="1072" height="312" alt="image" src="https://github.com/user-attachments/assets/3b42706a-8e36-48be-8f09-3b391528f231" />
+<img width="1323" height="776" alt="image" src="https://github.com/user-attachments/assets/8ca6714b-7336-4ba2-9036-4a98212584bc" />
+<img width="757" height="228" alt="image" src="https://github.com/user-attachments/assets/e5490dd6-86f4-4901-b0b4-c12ace324bc5" />
+
+`
 
 ---
 
@@ -298,9 +393,12 @@ items: const [
 
 > ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ: (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
 
-```text
+``text
 บันทึกผลลัพธ์ที่นี่
-```
+<img width="1552" height="977" alt="image" src="https://github.com/user-attachments/assets/4548b0d2-16fb-4128-8708-e38b5cef38ec" />
+<img width="1278" height="960" alt="image" src="https://github.com/user-attachments/assets/8b21474c-b5c6-4e27-a211-83e556ebdbd6" />
+
+`
 
 ---
 
@@ -348,9 +446,16 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว 
 
-```text
+``text
 บันทึกผลลัพธ์ที่นี่
-```
+
+<img width="1188" height="915" alt="Screenshot 2026-10-12 095434" src="https://github.com/user-attachments/assets/d2409ba2-1c11-4338-9d43-4b45f594d300" />
+
+<img width="1146" height="970" alt="image" src="https://github.com/user-attachments/assets/0e0114ea-a82e-491d-be37-4534d3d16450" />
+<img width="1796" height="988" alt="image" src="https://github.com/user-attachments/assets/b216abf5-3d47-4e22-989c-2a3f795f7303" />
+
+ListingDraftRepositoryDrift เมื่อผู้ใช้กดบันทึกร่าง ข้อมูลจะถูกเขียนลงในตาราง ListingDrafts และเมื่อเปิดหน้าลงประกาศขาย คลาส SellItemPage จะเรียกฟังก์ชัน _loadSavedDraft() ใน initState()
+``
 
 ---
 
@@ -362,9 +467,11 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 6.1** ถ่ายภาพหน้าจอที่แสดงให้เห็นว่า Tab รายการโปรดและหน้าร่างประกาศยังคงแสดงข้อมูลได้ตามปกติแม้ไม่มีอินเทอร์เน็ตเลย (ส่วน Tab หน้าหลักที่ดึงจาก Fake Store API คาดว่าจะแสดง Error ตามปกติ เพราะยังไม่ได้ทำ Local Cache ให้หน้านั้น) 
 
-```text
+``text
 บันทึกผลลัพธ์ที่นี่
-```
+<img width="1910" height="1005" alt="image" src="https://github.com/user-attachments/assets/b6077389-4529-4395-bc03-a4f530bdb531" />
+
+`
 
 ---
 
