@@ -56,7 +56,107 @@
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+import 'package:drift/drift.dart';
+
+/// =========================================================================
+/// 1. FavoriteItems: เก็บรายการสินค้าที่ผู้ใช้กดถูกใจเป็นครั้งแรก
+/// =========================================================================
+/// คุณสมบัติ:
+/// - อ้างอิง id สินค้าที่เป็นตัวเลข (productId) ทำหน้าที่เป็น Primary Key โดยตรง
+/// - แคชชื่อ ราคา และรูปภาพ เพื่อแสดงผลได้ทันทีแบบไม่ต้องรอโหลด API (Offline-first)
+/// - เรียงตามเวลาที่กดถูกใจล่าสุดได้ด้วย [likedAt]
+@DataClassName('FavoriteItem')
+class FavoriteItems extends Table {
+  /// รหัสสินค้าอ้างอิงจากระบบ Backend
+  /// ชนิดข้อมูล: IntColumn -> SQLite INTEGER
+  /// เหตุผล: สินค้าในระบบมักมี ID เป็นตัวเลข และเนื่องจากเป็นรายการสินค้าที่กดถูกใจ
+  /// สินค้าชิ้นเดิมไม่ควรถูกกดซ้ำ จึงกำหนดให้เป็น Primary Key โดยตรง
+  IntColumn get productId => integer()();
+
+  /// ชื่อสินค้า
+  /// ชนิดข้อมูล: TextColumn -> SQLite TEXT
+  /// เหตุผล: เก็บชื่อสินค้าภาษาไทย/อังกฤษ เพื่อนำมาแสดงบนหน้า Favorites ทันที
+  TextColumn get title => text().withLength(min: 1, max: 255)();
+
+  /// ราคาสินค้า
+  /// ชนิดข้อมูล: RealColumn -> SQLite REAL (แมปกับ double ใน Dart)
+  /// เหตุผล: ราคาสินค้ามักมีทศนิยม เช่น 199.50 บาท จึงเลือก RealColumn
+  RealColumn get price => real()();
+
+  /// URL รูปภาพสินค้าหน้าปก
+  /// ชนิดข้อมูล: TextColumn -> SQLite TEXT
+  /// เหตุผล: เก็บสตริง URL (CDN หรือ Cloud Storage) เพื่อให้ CachedNetworkImage นำไปแคชต่อ
+  TextColumn get imageUrl => text()();
+
+  /// เวลาที่กดถูกใจ
+  /// ชนิดข้อมูล: DateTimeColumn -> SQLite INTEGER (Unix epoch timestamp ในมิลลิวินาที)
+  /// เหตุผล: ใช้สำหรับจัดเรียงรายการที่เพิ่งถูกใจล่าสุดขึ้นก่อน (ORDER BY likedAt DESC)
+  /// พร้อมตั้งค่า Default ให้เป็นวันเวลาปัจจุบัน ณ ตอนที่บันทึก
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+
+  /// แนะนำ: ใส่ Index ที่คอลัมน์ likedAt เพื่อให้การ Sort เร็วขึ้นแม้มีรายการจำนวนมาก
+  @override
+  List<TableIndex> get tableIndexes => [
+    TableIndex('idx_favorite_liked_at', [likedAt]),
+  ];
+}
+
+/// =========================================================================
+/// 2. AiListingDrafts: เก็บร่างประกาศขายสินค้าที่ AI ช่วยแนะนำจากรูปภาพ
+/// =========================================================================
+/// คุณสมบัติ:
+/// - เก็บข้อมูลชั่วคราวลง SQLite ถาวร ปิดแอปเปิดใหม่ข้อมูลไม่หาย
+/// - มีชื่อประกาศ, หมวดหมู่, คำบรรยาย และ Path รูปถ่ายในเครื่อง
+/// - รู้ว่าแก้ไขล่าสุดเมื่อไหร่ด้วย [updatedAt]
+@DataClassName('AiListingDraft')
+class AiListingDrafts extends Table {
+  /// Primary Key ประจำแต่ละร่างประกาศ
+  /// ชนิดข้อมูล: IntColumn -> SQLite INTEGER AUTOINCREMENT
+  /// เหตุผล: ผู้ใช้อาจทดลองให้ AI วิเคราะห์ร่างสินค้าไว้หลายชิ้น จึงใช้ ID รันอัตโนมัติ
+  IntColumn get id => integer().autoIncrement()();
+
+  /// ชื่อประกาศขายสินค้า
+  /// ชนิดข้อมูล: TextColumn -> SQLite TEXT
+  /// เหตุผล: บันทึกชื่อสินค้าที่โมเดล AI สกัดได้จากภาพ เช่น "หนังสือ Calculus 1 สภาพ 95%"
+  TextColumn get title => text()();
+
+  /// หมวดหมู่สินค้า
+  /// ชนิดข้อมูล: TextColumn -> SQLite TEXT
+  /// เหตุผล: สตริงชื่อหมวดหมู่ที่ AI จำแนก (เช่น "ตำราเรียน", "อุปกรณ์ไอที") นำไปกรองหมวดหมู่ได้ง่าย
+  TextColumn get category => text()();
+
+  /// คำบรรยายสินค้าที่ AI ร่างให้
+  /// ชนิดข้อมูล: TextColumn -> SQLite TEXT
+  /// เหตุผล: รองรับเนื้อหายาวแบบไม่จำกัดตัวอักษร ผู้ใช้สามารถแก้ไขเพิ่มเติมก่อนโพสต์จริงได้
+  TextColumn get description => text()();
+
+  /// Path ของรูปภาพในเครื่อง
+  /// ชนิดข้อมูล: TextColumn -> SQLite TEXT
+  /// เหตุผล: ในอุปกรณ์มือถือควรอ้างอิง File Path ในเครื่อง (เช่น File.path) 
+  /// การเก็บ Path แทนการเก็บรูปภาพทั้งก้อนเป็น BLOB จะช่วยให้ฐานข้อมูลเบา รวดเร็ว และไม่กิน RAM
+  TextColumn get imagePath => text()();
+
+  /// ราคาประเมินที่ AI ช่วยแนะนำ (ใส่หรือไม่ใส่ก็ได้)
+  /// ชนิดข้อมูล: RealColumn -> SQLite REAL (Nullable)
+  /// เหตุผล: AI อาจช่วยคำนวณราคาเฉลี่ยในมหาลัยมาให้ ผู้ใช้สามารถแก้ไขภายหลังได้
+  RealColumn get estimatedPrice => real().nullable()();
+
+  /// วันเวลาที่สร้างร่างครั้งแรก
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  /// วันเวลาที่แก้ไขล่าสุด
+  /// ชนิดข้อมูล: DateTimeColumn -> SQLite INTEGER
+  /// เหตุผล: เพื่อให้รู้ว่าผู้ใช้แก้ไขร่างนี้ล่าสุดเมื่อไหร่ สามารถนำมาเรียงลำดับดราฟต์ล่าสุดได้
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  List<TableIndex> get tableIndexes => [
+    TableIndex('idx_draft_updated_at', [updatedAt]),
+  ];
+}
 ```
 
 
@@ -72,8 +172,17 @@
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+ข้อ 1.ถูกบางส่วนตารางแรกรหัสสินค้าเป็นรหัสหลักป้องกันข้อมูลซ้ำได้แต่ไม่ได้กำหนดให้เลขเพิ่มอัตโนมัติส่วนตารางที่สองกำหนดได้ถูกแล้ว
+
+ข้อ 2.ถูกเพราะGeminiเลือกชนิดข้อมูลที่รองรับตัวเลขทศนิยมได้จึงไม่จำเป็นต้องแก้ไข
+
+ข้อ 3.ควรเก็บข้อมูลสินค้าชื่อราคาและรูปภาพไว้ในเครื่องเพื่อผู้ใช้ดูข้อมูลได้แม้ไม่มีเน็ต
+
+ข้อ 4.มีการป้องกันข้อมูลซ้ำใช้รหัสสินค้าเป็นรหัสหลักทำให้ไม่สามารถบันทึกสินค้าซ้ำได้ไม่จำเป็นต้องเพิ่มคำสั่งป้องกันข้อมูลซ้ำอีก
 ```
+
+<img width="1917" height="907" alt="image" src="https://github.com/user-attachments/assets/cc5a2fcd-f415-4eeb-baf8-c9433a1aed43" />
+
 
 ---
 
@@ -171,9 +280,9 @@ dart run build_runner build --delete-conflicting-outputs
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+ทึกผลลัพธ์ที่นี่
+
+<img width="1012" height="911" alt="image" src="https://github.com/user-attachments/assets/bbec43ea-e6c3-4bfd-b145-7c2560ca9556" />
 
 ---
 
@@ -298,9 +407,10 @@ items: const [
 
 > ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ: (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="401" height="927" alt="สกรีนช็อต 2026-10-08 233832" src="https://github.com/user-attachments/assets/38bcd48f-8060-4e55-b069-7f749b8af7dc" />
+<img width="400" height="935" alt="สกรีนช็อต 2026-10-08 233726" src="https://github.com/user-attachments/assets/6c7dc70a-f307-45e0-b11c-0d54b33da5ac" />
+<img width="402" height="933" alt="สกรีนช็อต 2026-10-08 233204" src="https://github.com/user-attachments/assets/5e9cf129-b4d9-44fb-afbd-13019d66fc30" />
+
 
 ---
 
@@ -346,11 +456,12 @@ class SellItemPage extends StatefulWidget {
 
 **ทำไมหน้านี้ไม่ใช่ Tab ที่ 4**: ตาม `campus_marketplace_lab_roadmap.md` หัวข้อ 2.1 มีกฎชัดเจนว่าอะไรควรเป็น Tab (ปลายทางหลักที่สลับไปมาตลอดเวลา) กับอะไรควรเป็น Push/Pop (Flow เฉพาะกิจที่มีจุดเริ่ม-จบ) "ร่างประกาศของฉัน" เป็นหน้าจัดการร่างที่ผูกกับ Flow การลงประกาศโดยตรง ไม่ใช่ปลายทางหลักที่ผู้ใช้เปิดดูตลอดเวลาเหมือน Favorites อีกทั้ง Roadmap ได้กำหนดไว้แล้วว่า Tab ที่ 4 ของแอปคือ "โปรไฟล์" ในสัปดาห์หน้า การเพิ่ม Tab ใหม่อีกตัวตอนนี้จะทำให้ลำดับ Tab ทั้งเทอมเพี้ยนไปจากแผน **จึงให้เข้าถึงหน้านี้ด้วยปุ่มไอคอนใน AppBar ของ Tab "ลงประกาศขาย" แทน** (เช่น `IconButton(icon: Icon(Icons.history), onPressed: () => Navigator.push(...))`) เพิ่ม `AppBar` ให้ `SellItemPage` ถ้ายังไม่มี แล้วใส่ปุ่มนี้ไว้ที่ `actions`
 
-> ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว 
+> ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="412" height="912" alt="สกรีนช็อต 2026-10-14 211529" src="https://github.com/user-attachments/assets/ac4dbeff-dd5c-49eb-82bd-48380b29c114" />
+<img width="415" height="921" alt="image" src="https://github.com/user-attachments/assets/264bbe7f-8ecc-420f-8eb7-3ed6ff71b0b8" />
+<img width="413" height="922" alt="image" src="https://github.com/user-attachments/assets/7e82c59b-cd2f-47cd-a3a1-b5876aad80b4" />
+<img width="413" height="922" alt="image" src="https://github.com/user-attachments/assets/609c74b3-63df-453c-8564-1eea34566bd9" />
 
 ---
 
@@ -362,9 +473,9 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 6.1** ถ่ายภาพหน้าจอที่แสดงให้เห็นว่า Tab รายการโปรดและหน้าร่างประกาศยังคงแสดงข้อมูลได้ตามปกติแม้ไม่มีอินเทอร์เน็ตเลย (ส่วน Tab หน้าหลักที่ดึงจาก Fake Store API คาดว่าจะแสดง Error ตามปกติ เพราะยังไม่ได้ทำ Local Cache ให้หน้านั้น) 
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="417" height="922" alt="image" src="https://github.com/user-attachments/assets/8fa63256-7cb1-4994-9ae0-6923cedd51e1" />
+<img width="416" height="922" alt="image" src="https://github.com/user-attachments/assets/ffbf2e0d-ddff-4e3e-ad94-4a8477524fab" />
+
 
 ---
 
