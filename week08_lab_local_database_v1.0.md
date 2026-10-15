@@ -58,6 +58,9 @@
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+<img width="998" height="673" alt="Screenshot 2026-10-15 210507" src="https://github.com/user-attachments/assets/c0f369b5-8b1e-4dd5-ae2d-49a2d81cb51b" />
+<img width="1006" height="275" alt="Screenshot 2026-10-15 210526" src="https://github.com/user-attachments/assets/28044993-c855-4772-8016-bd1d92308455" />
+<img width="1005" height="856" alt="Screenshot 2026-10-15 210550" src="https://github.com/user-attachments/assets/cb5fb759-16bf-4d47-a8fa-1ed4d8a051c4" />
 
 
 ### ขั้นตอนที่ 1.2: ตรวจสอบและเทียบกับหลักการในบทเรียน 🧠 คิดเอง
@@ -73,7 +76,18 @@
 
 ```text
 บันทึกผลลัพธ์ที่นี่
+1.การกำหนด Primary Key: Gemini กำหนดตาราง Draft ถูกต้องแล้ว (id แบบ Auto-increment)
+แต่ตาราง LikedItems ไม่ตรงกับบทเรียน ( Gemini ใช้ productId เป็น PK โดยตรง แทนที่จะสร้าง id PK
+แยกต่างหาก แล้วค่อยคุม productId ไม่ให้ซ้ำ)
+2.ชนิดข้อมูลราคา: ตรงกับบทเรียน Gemini เลือกใช้ RealColumn (real()) ซึ่งเทียบเท่ากับชนิดข้อมูล double ใน Dart
+3.การเก็บข้อมูลแบบ Offline-first: Gemini แนะนำให้เก็บสำเนาข้อมูล (Denormalize) เช่น ชื่อ ราคา
+และรูปภาพ ไว้ด้วย ซึ่งถูกต้องตามหลัก Offline-first (หัวข้อ 8.6) เพราะถ้าเก็บแค่ ID
+แล้วต้องต่อเน็ตไปดึง API เมื่อไม่มีอินเทอร์เน็ต แอปจะไม่สามารถแสดงผลรายการที่ชอบได้
+4.การใส่ .unique() ป้องกันข้อมูลซ้ำ: Gemini ไม่ได้ใส่ .unique() มาในโค้ด (เพราะใช้ PK คุมแทน)
+ต้องแก้ไขโดยใส่ .unique() ที่คอลัมน์ itemId เพื่อป้องกันผู้ใช้กดถูกใจสินค้าชิ้นเดิมซ้ำหลายครั้ง
 ```
+<img width="863" height="350" alt="Screenshot 2026-10-15 211334" src="https://github.com/user-attachments/assets/c90129c2-1842-4d9c-b635-b192a20d4cee" />
+
 
 ---
 
@@ -174,6 +188,7 @@ capture หน้าจอผลลัพธ์คำสั่ง `dart run buil
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+<img width="1085" height="270" alt="Screenshot 2026-10-15 213011" src="https://github.com/user-attachments/assets/f81cb92a-34a5-4125-b0b2-df3136ab0bad" />
 
 ---
 
@@ -301,6 +316,10 @@ items: const [
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+<img width="518" height="1142" alt="Screenshot 2026-10-15 220325" src="https://github.com/user-attachments/assets/d54d71c4-ffb4-4289-9be8-539fbe3a712e" />
+<img width="515" height="1135" alt="Screenshot 2026-10-15 220825" src="https://github.com/user-attachments/assets/cc55ef16-43d7-47b9-ad0f-37a508429a4c" />
+<img width="516" height="1135" alt="Screenshot 2026-10-15 220940" src="https://github.com/user-attachments/assets/f1caf456-21ee-4469-b804-cb0baae2354b" />
+<img width="517" height="1137" alt="Screenshot 2026-10-15 220954" src="https://github.com/user-attachments/assets/ce360bef-c9b5-4462-8bba-e59654e0f2a7" />
 
 ---
 
@@ -351,6 +370,11 @@ class SellItemPage extends StatefulWidget {
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+<img width="498" height="1136" alt="Screenshot 2026-10-15 223631" src="https://github.com/user-attachments/assets/8b4debca-859c-4833-9722-f325dcc3eba1" />
+<img width="505" height="1140" alt="Screenshot 2026-10-15 223700" src="https://github.com/user-attachments/assets/a3fd3b3d-277a-42ad-9c18-864c5b46b571" />
+<img width="518" height="1140" alt="Screenshot 2026-10-15 223728" src="https://github.com/user-attachments/assets/16c1c2bf-42b4-4e12-96a0-4e19fbc6e75c" />
+<img width="517" height="1133" alt="Screenshot 2026-10-15 223756" src="https://github.com/user-attachments/assets/6ffac2b7-29f8-4721-86e9-9c8a70d63609" />
+<img width="512" height="1137" alt="Screenshot 2026-10-15 223906" src="https://github.com/user-attachments/assets/845bcbdc-c43f-4d2e-ab78-d8c77d74e040" />
 
 ---
 
@@ -365,6 +389,7 @@ class SellItemPage extends StatefulWidget {
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+<img width="508" height="1135" alt="Screenshot 2026-10-15 224045" src="https://github.com/user-attachments/assets/805fbccd-fd6b-491f-bcbb-1c7cc68167d1" />
 
 ---
 
