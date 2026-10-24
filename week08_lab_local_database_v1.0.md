@@ -54,10 +54,10 @@
 ```
 
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
-
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="1470" height="956" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 00 26 42" src="https://github.com/user-attachments/assets/d3ef4264-c8c7-4214-89df-01e78cd945ae" />
+<img width="1470" height="956" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 00 26 51" src="https://github.com/user-attachments/assets/8dcfff88-7989-45fc-9150-ef4f9943cd19" />
+<img width="1470" height="956" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 00 26 59" src="https://github.com/user-attachments/assets/e40286fc-dddc-4aef-88d1-f7fe0ae1d61c" />
+<img width="1470" height="956" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 00 27 06" src="https://github.com/user-attachments/assets/6a18ca27-8b36-43e5-b2b1-32aa85e682a2" />
 
 
 ### ขั้นตอนที่ 1.2: ตรวจสอบและเทียบกับหลักการในบทเรียน 🧠 คิดเอง
@@ -70,10 +70,10 @@
 - Gemini กำหนดให้คอลัมน์ที่อ้างอิงสินค้า (`itemId`) ห้ามมีค่าซ้ำกัน (`.unique()`) หรือไม่ ถ้าไม่ได้กำหนด ให้เพิ่มเอง เพราะถ้าไม่มีข้อบังคับนี้ ผู้ใช้กดหัวใจสินค้าชิ้นเดียวกันซ้ำได้ไม่จำกัด ทำให้ตาราง Favorites มีแถวซ้ำกันสะสมไปเรื่อย ๆ
 
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
-
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="1470" height="956" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 00 36 34" src="https://github.com/user-attachments/assets/3537080c-c8fc-4240-a637-7b58b6a94259" />
+<img width="1470" height="956" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 00 36 44" src="https://github.com/user-attachments/assets/ad4dcb1b-501f-444d-8e9a-c9b7017b9a0f" />
+<img width="1470" height="956" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 00 36 58" src="https://github.com/user-attachments/assets/c13f11e1-5842-43eb-971e-96471f58de48" />
+<img width="1470" height="956" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 00 37 11" src="https://github.com/user-attachments/assets/505bb6ea-9c94-46ca-98be-8b1af6e442c1" />
 
 ---
 
@@ -171,11 +171,12 @@ dart run build_runner build --delete-conflicting-outputs
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="1470" height="956" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 01 42 44" src="https://github.com/user-attachments/assets/22f1cae0-a2b8-47b4-99d4-ba80bf5c58de" />
+<img width="1470" height="956" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 01 43 48" src="https://github.com/user-attachments/assets/7c117762-ccfe-4b53-bfeb-4afdb1511bfa" />
 
 ---
+cd campus_marketplace_w7
+flutter run
 
 ## ส่วนที่ 4: สร้างฟีเจอร์ "รายการโปรด" (Favorites) ตั้งแต่ต้น
 
@@ -298,9 +299,10 @@ items: const [
 
 > ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ: (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="345" height="793" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 02 02 25" src="https://github.com/user-attachments/assets/ce074058-3d09-4a48-b9a4-f87b9ac5506f" />
+<img width="349" height="790" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 02 03 25" src="https://github.com/user-attachments/assets/c19e805a-bdc6-417e-b2d9-829790691c9d" />
+<img width="325" height="738" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 02 13 04" src="https://github.com/user-attachments/assets/19a2314d-756b-4fb5-9d26-855bcc8ace42" />
+<img width="334" height="751" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 02 15 17" src="https://github.com/user-attachments/assets/a979d7db-efec-4018-9561-e0aec05a4207" />
 
 ---
 
@@ -348,9 +350,10 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว 
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="350" height="752" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 02 30 33" src="https://github.com/user-attachments/assets/c26ea6ba-a8f3-463f-9cc4-fb9f04ff6273" />
+<img width="448" height="783" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 02 30 57" src="https://github.com/user-attachments/assets/7b2ad54f-743b-4586-b0ea-bd3e9fc5f196" />
+<img width="335" height="748" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 02 31 41" src="https://github.com/user-attachments/assets/ddb822bc-e6ac-44f3-9684-5c3e5e204417" />
+<img width="333" height="740" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 02 32 40" src="https://github.com/user-attachments/assets/dea2c522-e5fa-4939-a7f3-e6feefc3d313" />
 
 ---
 
@@ -362,9 +365,9 @@ class SellItemPage extends StatefulWidget {
 
 > ✅ **Checkpoint 6.1** ถ่ายภาพหน้าจอที่แสดงให้เห็นว่า Tab รายการโปรดและหน้าร่างประกาศยังคงแสดงข้อมูลได้ตามปกติแม้ไม่มีอินเทอร์เน็ตเลย (ส่วน Tab หน้าหลักที่ดึงจาก Fake Store API คาดว่าจะแสดง Error ตามปกติ เพราะยังไม่ได้ทำ Local Cache ให้หน้านั้น) 
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+<img width="363" height="800" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 02 44 04" src="https://github.com/user-attachments/assets/cb8b7104-3787-447c-8712-2d30843ee811" />
+<img width="360" height="806" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 02 44 10" src="https://github.com/user-attachments/assets/7f9b1d90-97d6-491f-8a83-2bbdc3912927" />
+<img width="363" height="802" alt="ภาพถ่ายหน้าจอ 2569-10-25 เวลา 02 44 15" src="https://github.com/user-attachments/assets/7c5f57e5-a63d-4ad7-b09c-8f6db025ddf2" />
 
 ---
 
