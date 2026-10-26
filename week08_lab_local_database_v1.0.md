@@ -55,8 +55,43 @@
 
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
-```text
-บันทึกผลลัพธ์ที่นี่
+```
+import 'package:drift/drift.dart';
+
+/// 1. ตารางเก็บรายการสินค้าที่ถูกใจ (FavoriteProducts)
+class FavoriteProducts extends Table {
+  // รหัสสินค้าจากระบบหลัก ใช้เป็น Primary Key เพื่อป้องกันการถูกใจซ้ำ
+  IntColumn get productId => integer()();
+
+  // แคชข้อมูลพื้นฐานไว้แสดงผลแบบ Offline หรือไม่ต้องเรียก API ซ้ำ
+  TextColumn get title => text()();
+  RealColumn get price => real()();
+  TextColumn get imageUrl => text().nullable()();
+
+  // เวลาที่กดถูกใจ เพื่อใช้เรียงลำดับรายการล่าสุด
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+/// 2. ตารางเก็บร่างประกาศขายสินค้าที่ AI แนะนำ (ListingDrafts)
+class ListingDrafts extends Table {
+  // Primary key แบบ Auto-increment สำหรับระบุ draft แต่ละใบ
+  IntColumn get id => integer().autoIncrement()();
+
+  // ข้อมูลที่ AI ช่วยแนะนำ หรือผู้ใช้กำลังแก้ไข (อนุญาตให้ว่างได้ เพราะเป็นร่าง)
+  TextColumn get title => text().nullable()();
+  TextColumn get category => text().nullable()();
+  TextColumn get description => text().nullable()();
+
+  // Path ของรูปภาพในเครื่อง (Local Storage Path)
+  TextColumn get imagePath => text()();
+
+  // บันทึกเวลาที่สร้างและเวลาแก้ไขล่าสุด
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
 ```
 
 
@@ -71,9 +106,33 @@
 
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
-```text
-บันทึกผลลัพธ์ที่นี่
 ```
+1. การกำหนด Primary Key ให้แต่ละตาราง
+ตารางสินค้าที่ถูกใจ (FavoriteProducts): ยังไม่ตรงตามบทเรียน
+Gemini นำ productId จากภายนอกมากำหนดเป็น Primary Key โดยตรง ซึ่งยังไม่ได้สร้างคอลัมน์ id ที่เป็น Auto-increment Integer ประจำตารางภายในเครื่องตามแนวทางของบทเรียน
+ตารางร่างประกาศ (ListingDrafts): กำหนดได้ถูกต้อง
+มีการใช้ IntColumn get id => integer().autoIncrement()(); เป็น Primary Key แบบ Auto-increment Integer ตรงตามหลักการของบทเรียน
+แนวทางปรับปรุง: ควรเพิ่ม id แบบ .autoIncrement() ให้กับตาราง Favorites ด้วย เพื่อให้โครงสร้างตารางในเครื่องเป็นมาตรฐานเดียวกัน
+
+2. ชนิดข้อมูลของคอลัมน์ราคาสินค้า
+ผลการตรวจสอบ: ตรงกับบทเรียนแล้ว
+Gemini เลือกใช้ RealColumn (real()) ซึ่ง SQLite จะแปลงเป็นชนิดข้อมูล double ในภาษา Dart เหมาะสมสำหรับการเก็บค่าที่เป็นตัวเลขทศนิยมอย่างราคาสินค้า จึงไม่ต้องแก้ไขชนิดข้อมูลในส่วนนี้
+
+3. การเก็บสำเนาข้อมูลกับหลักการ Offline-first (หัวข้อ 8.6)
+สิ่งที่ Gemini แนะนำ: Gemini เลือกแนวทาง เก็บสำเนาข้อมูลสำคัญไว้ในตาราง Favorites (เช่น title, price, imageUrl) ไม่ได้เก็บเพียงแค่ itemId
+เหตุผลตามหลักการ Offline-first:
+หากเราบันทึกไว้เฉพาะ itemId แล้วต้องพึ่งพาการดึงข้อมูลจาก API ตลอดเวลา เมื่อผู้ใช้งานอยู่ในจุดที่ไม่มีสัญญาณอินเทอร์เน็ต หน้าจอ "สินค้าที่ถูกใจ" จะว่างเปล่าหรือแสดงผลไม่ได้เลย เพราะแอปไม่มีข้อมูลชื่อหรือรูปภาพพร้อมแสดง
+การแคชข้อมูลสำคัญ (Read-model / Denormalization) ลงฐานข้อมูลในเครื่องไว้ล่วงหน้า ทำให้แอปสามารถเรนเดอร์หน้ารายการโปรดได้ทันทีโดยไม่ต้องรอโหลดจากเซิร์ฟเวอร์ สอดคล้องกับหัวใจของ Offline-first ที่เน้นให้ผู้ใช้ใช้งานแอปได้ต่อเนื่องแม้ในสภาวะออฟไลน์
+
+4. การบังคับค่าไม่ให้ซ้ำกัน (.unique()) บนรหัสสินค้า
+สิ่งที่ Gemini ทำ: Gemini ไม่ได้ใช้คำสั่ง .unique() ที่คอลัมน์โดยตรง แต่อาศัยการตั้ง productId เป็น Primary Key ของตารางแทน
+การแก้ไข: เมื่อเราปรับโครงสร้างตาราง Favorites ให้มี id แบบ Auto-increment เป็น Primary Key ตามบทเรียนแล้ว คอลัมน์ที่ใช้อ้างอิงสินค้า (itemId หรือ productId) จะกลายเป็นคอลัมน์ทั่วไป จึง จำเป็นต้องเพิ่ม .unique() เข้าไปทันที มิฉะนั้น หากแอปทำงานผิดพลาดหรือผู้ใช้กดถูกใจซ้ำ จะเกิดแถวข้อมูลของสินค้าเดิมเพิ่มขึ้นมาเรื่อย ๆ ในฐานข้อมูล
+
+```
+
+
+<img width="1596" height="857" alt="image" src="https://github.com/user-attachments/assets/f705a552-dc80-4206-9d98-5324c47830a0" />
+
 
 ---
 
