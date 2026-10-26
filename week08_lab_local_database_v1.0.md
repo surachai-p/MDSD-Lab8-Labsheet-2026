@@ -362,9 +362,22 @@ items: const [
 
 > ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ: (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+
+ก )  <img width="350" height="800" alt="image" src="https://github.com/user-attachments/assets/b2bd7ed5-0a05-4476-a196-1468cf807516" />
+
+
+ข )  <img width="346" height="802" alt="image" src="https://github.com/user-attachments/assets/bf2d34f9-8c18-425f-88c1-6a0bc5905f55" />
+
+
+ค)   <img width="361" height="777" alt="image" src="https://github.com/user-attachments/assets/5ba48527-1b42-41ab-ac1d-4531e3dd0a6c" />
+
+
+ง ) <img width="355" height="797" alt="image" src="https://github.com/user-attachments/assets/4c73ad00-189a-4a15-92ad-97e2de88c67e" />
+
+
+
+<img width="350" height="800" alt="image" src="https://github.com/user-attachments/assets/0dd663ea-743a-4bf1-b412-2b3af0bb3c66" />
+
 
 ---
 
