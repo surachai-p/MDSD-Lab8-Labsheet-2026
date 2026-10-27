@@ -429,9 +429,8 @@ class SellItemPage extends StatefulWidget {
 
 2.   <img width="347" height="812" alt="image" src="https://github.com/user-attachments/assets/4c9b5ebf-8c03-46c0-aa1c-023189a31f71" />
 
-3.
+3.   <img width="360" height="802" alt="image" src="https://github.com/user-attachments/assets/9102522a-217a-442e-a9a1-6adc93ebe0fe" />
 
-4.
 
 ---
 
