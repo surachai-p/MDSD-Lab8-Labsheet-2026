@@ -57,6 +57,50 @@
 
 ```text
 บันทึกผลลัพธ์ที่นี่
+
+import 'package:drift/drift.dart';
+
+// -------------------------------------------------------------
+// 1. ตารางเก็บรายการสินค้าที่ถูกใจ (FavoriteProducts)
+// -------------------------------------------------------------
+class FavoriteProducts extends Table {
+  // ใช้ ID สินค้าจากเซิร์ฟเวอร์เป็น Primary Key เพื่อป้องกันการกดถูกใจซ้ำ
+  IntColumn get productId => integer()();
+  
+  // ชื่อสินค้า
+  TextColumn get name => text().withLength(min: 1, max: 255)();
+  
+  // ราคาสินค้า รองรับทศนิยม
+  RealColumn get price => real()();
+  
+  // URL รูปภาพสำหรับแคชไว้แสดงผลออฟไลน์
+  TextColumn get imageUrl => text()();
+  
+  // บันทึกเวลาที่กดถูกใจ เพื่อใช้ Order By ล่าสุด
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+// -------------------------------------------------------------
+// 2. ตารางเก็บร่างประกาศขายสินค้าจาก AI (ProductDrafts)
+// -------------------------------------------------------------
+class ProductDrafts extends Table {
+  // รหัสร่างประกาศ รันเลขอัตโนมัติในเครื่อง
+  IntColumn get id => integer().autoIncrement()();
+  
+  // ข้อมูลที่ AI สร้างให้อาจยังไม่สมบูรณ์ จึงอนุญาตให้เป็น null ได้
+  TextColumn get title => text().nullable()();
+  TextColumn get category => text().nullable()();
+  TextColumn get description => text().nullable()();
+  
+  // Path รูปภาพในเครื่อง จำเป็นต้องมีเสมอเพราะ AI วิเคราะห์มาจากรูปนี้
+  TextColumn get localImagePath => text()();
+  
+  // เวลาที่แก้ไขล่าสุด
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
 ```
 
 
@@ -74,6 +118,12 @@
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+<img width="801" height="378" alt="image" src="https://github.com/user-attachments/assets/03f24ea3-b39b-48fd-b598-9cc526e31a65" />
+<img width="798" height="233" alt="image" src="https://github.com/user-attachments/assets/c341f549-3d3c-4a44-89f6-7df972bb2132" />
+<img width="805" height="308" alt="image" src="https://github.com/user-attachments/assets/c2730d29-bba7-4575-95d5-d56e8b93abc3" />
+<img width="802" height="368" alt="image" src="https://github.com/user-attachments/assets/f8873282-80ff-41ea-af6c-132b59f94830" />
+<img width="786" height="261" alt="image" src="https://github.com/user-attachments/assets/7e949f30-e3ce-4750-8cc2-4724b7111274" />
+
 
 ---
 
@@ -174,6 +224,9 @@ capture หน้าจอผลลัพธ์คำสั่ง `dart run buil
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+
+<img width="653" height="117" alt="image" src="https://github.com/user-attachments/assets/69db31d0-fa69-43e4-a9ff-2f3828624e6a" />
+
 
 ---
 
@@ -301,6 +354,11 @@ items: const [
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+<img width="964" height="2149" alt="image" src="https://github.com/user-attachments/assets/a7e55bed-4a94-4c82-83ba-07e312c84de9" />
+<img width="964" height="2149" alt="image" src="https://github.com/user-attachments/assets/40f782ca-ecdc-427c-aeb3-4b03e7ba4f82" />
+<img width="964" height="2149" alt="image" src="https://github.com/user-attachments/assets/1f794b35-8b28-41c8-a51d-91150fe658b7" />
+<img width="964" height="2149" alt="image" src="https://github.com/user-attachments/assets/5f2809ee-bab2-43e4-9e11-6a7bb9d5e0cb" />
+<img width="964" height="2149" alt="image" src="https://github.com/user-attachments/assets/cbbcc2a3-ac5b-427b-8573-8e0ae29e68f9" />
 
 ---
 
@@ -351,6 +409,11 @@ class SellItemPage extends StatefulWidget {
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+<img width="964" height="2149" alt="image" src="https://github.com/user-attachments/assets/40e83e64-9955-4be3-aed1-45509cc230b7" />
+<img width="964" height="2149" alt="image" src="https://github.com/user-attachments/assets/ed79376c-dd88-407c-9da2-380e969e4a08" />
+<img width="964" height="2149" alt="image" src="https://github.com/user-attachments/assets/a135bb8b-d15a-4ebb-84b6-36a92d73abc4" />
+<img width="964" height="2149" alt="image" src="https://github.com/user-attachments/assets/a64544c1-8c4b-401c-8695-639724c22aab" />
+
 
 ---
 
@@ -365,6 +428,8 @@ class SellItemPage extends StatefulWidget {
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+<img width="964" height="2149" alt="image" src="https://github.com/user-attachments/assets/491d69d9-d47c-4e1e-91b7-f96e4337a85b" />
+<img width="964" height="2149" alt="image" src="https://github.com/user-attachments/assets/37588d0f-f2d7-41c6-9f0c-5aca478b2bbf" />
 
 ---
 
