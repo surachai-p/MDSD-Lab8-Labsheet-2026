@@ -56,7 +56,81 @@
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+
+นี่คือโค้ด Dart สำหรับนิยามตารางทั้งสองด้วย Drift พร้อมเหตุผลในการเลือกชนิดข้อมูล (Column Type) ของแต่ละฟิลด์ครับ
+โค้ด Dart (Drift Table Definition)
+code
+Dart
+import 'package:drift/drift.dart';
+
+// ----------------------------------------------------------------------
+// 1. ตารางเก็บสินค้าที่ถูกใจ (FavoriteItems)
+// ----------------------------------------------------------------------
+class FavoriteItems extends Table {
+  // รหัสสินค้าจากระบบหลัก (ใช้เป็น Primary Key)
+  IntColumn get productId => integer()();
+
+  // ชื่อสินค้า
+  TextColumn get title => text()();
+
+  // ราคาสินค้า
+  RealColumn get price => real()();
+
+  // URL หรือ Path รูปภาพ (อนุญาตให้เป็น null ได้เผื่อกรณีสินค้าไม่มีรูป)
+  TextColumn get imageUrl => text().nullable()();
+
+  // เวลาที่กดถูกใจ (ค่าเริ่มต้นเป็นเวลาปัจจุบัน)
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+// ----------------------------------------------------------------------
+// 2. ตารางเก็บร่างประกาศขายสินค้าจาก AI (DraftListings)
+// ----------------------------------------------------------------------
+class DraftListings extends Table {
+  // Primary Key แบบ Auto Increment สำหรับร่างประกาศแต่ละรายการ
+  IntColumn get id => integer().autoIncrement()();
+
+  // ชื่อประกาศ (nullable เผื่อผู้ใช้ยังไม่แก้ไข/AI ยังไม่สรุปชื่อ)
+  TextColumn get title => text().nullable()();
+
+  // หมวดหมู่สินค้า
+  TextColumn get category => text().nullable()();
+
+  // รายละเอียด/คำบรรยายสินค้า
+  TextColumn get description => text().nullable()();
+
+  // Path ของไฟล์รูปภาพในเครื่อง (Local file path)
+  TextColumn get imagePath => text()();
+
+  // เวลาที่แก้ไขล่าสุด
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
+คำอธิบายชนิดข้อมูลและเหตุผลในการออกแบบ
+ตารางที่ 1: FavoriteItems (สินค้าที่ถูกใจ)
+คอลัมน์	ชนิดข้อมูลใน Drift	เหตุผลในการเลือก
+productId	IntColumn (integer())	อิงจากโจทย์ที่ระบุว่าเป็นตัวเลข และกำหนดให้เป็น primaryKey เพื่อป้องกันข้อมูลซ้ำ (กดถูกใจได้ครั้งเดียวต่อหนึ่งสินค้า) รวมถึงการค้นหาด้วย ID ทำได้รวดเร็ว
+title	TextColumn (text())	ใช้เก็บชื่อสินค้า (String) ไว้แสดงผลในหน้ารายการสินค้าถูกใจโดยตรงโดยไม่ต้องยิง API ซ้ำ
+price	RealColumn (real())	เหมาะสำหรับข้อมูลตัวเลขทศนิยม (double) เพื่อรองรับราคาที่มีเศษสตางค์ได้แม่นยำใน SQLite
+imageUrl	TextColumn (text().nullable())	เก็บ URL ของภาพแคชไว้ และใส่ .nullable() เผื่อกรณีที่สินค้านั้นไม่มีภาพประกอบ ระบบจะได้ไม่ขัดข้อง
+likedAt	DateTimeColumn (dateTime())	ใช้เก็บ Timestamp สำหรับการจัดเรียง (Ordering) จากล่าสุดไปเก่าสุด (ORDER BY liked_at DESC) และใส่ .withDefault(currentDateAndTime) เพื่อให้บันทึกเวลาปัจจุบันอัตโนมัติทันทีที่กดถูกใจ
+ตารางที่ 2: DraftListings (ร่างประกาศขายจาก AI)
+คอลัมน์	ชนิดข้อมูลใน Drift	เหตุผลในการเลือก
+id	IntColumn (integer().autoIncrement())	เป็น Key หลักที่ SQLite รันลำดับให้อัตโนมัติ เพื่อแยกแยะแต่ละร่างออกจากกันอย่างอิสระ
+title, category, description	TextColumn (text().nullable())	ข้อมูลประเภทข้อความ แต่ใส่ .nullable() ไว้ เพราะเป็น "ร่าง (Draft)" ผู้ใช้อาจบันทึกค้างไว้ระหว่างที่ AI เพิ่งประมวลผลเสร็จ หรือผู้ใช้ยังกรอกข้อมูลไม่ครบถ้วนก่อนปิดแอป
+imagePath	TextColumn (text())	เก็บ Path ของรูปภาพในเครื่อง (Local Storage Path) เป็นข้อความ ไม่แนะนำให้เก็บรูปเป็น Blob (ไบนารี) ในฐานข้อมูลโดยตรง เพราะจะทำให้ฐานข้อมูลบวมและอ่านข้อมูลช้า
+updatedAt	DateTimeColumn (dateTime())	บันทึกเวลาล่าสุดที่มีการแก้ไข เพื่อนำไปแสดงผลบอกผู้ใช้ว่า "แก้ไขล่าสุดเมื่อ..." หรือใช้เรียงลำดับดึงร่างล่าสุดขึ้นมาทำต่อ
+💡 ข้อเสนอแนะเพิ่มเติมสำหรับการนำไปใช้งาน
+การเรียงลำดับ Favorite: หากมีสินค้าถูกใจจำนวนมาก สามารถเพิ่ม Index ให้กับฟิลด์ likedAt ได้ เพื่อให้การ Query แบบจัดเรียงตามเวลาทำได้เร็วขึ้น:
+code
+Dart
+@override
+List<Set<Column>> get uniqueKeys => [];
+// หรือสร้าง Index ในระดับ DatabaseAccessor/Database
+การอัปเดต updatedAt ใน Draft: เมื่อผู้ใช้มีการแก้ไขข้อมูลร่างประกาศ อย่าลืมส่ง Value(DateTime.now()) อัปเดตคอลัมน์ updatedAt ด้วยทุกครั้ง เพื่อให้เวลายังคงเป็นปัจจุบันเสมอ
+
 ```
 
 
@@ -72,7 +146,53 @@
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+1. การกำหนด Primary Key ของแต่ละตาราง
+ตาราง FavoriteItems (ยังไม่ตรงตามบทเรียน):
+Gemini กำหนดให้ productId ทำหน้าที่เป็น Primary Key โดยตรง ซึ่งไม่ตรงตามแนวปฏิบัติในบทเรียนหัวข้อ 8.3 ที่แนะนำให้ทุกตารางมีคอลัมน์ id แบบ integer().autoIncrement()() เป็น Primary Key เฉพาะของตารางเอง
+สิ่งที่ต้องปรับปรุง: ต้องเพิ่มคอลัมน์ id เป็น Auto-increment Primary Key แล้วแยกคอลัมน์อ้างอิงสินค้าออกมาต่างหาก
+ตาราง DraftListings (ถูกต้อง):
+Gemini กำหนด IntColumn get id => integer().autoIncrement()(); ซึ่งถูกต้องและตรงตามบทเรียนเรียบร้อยแล้ว
+2. ชนิดข้อมูลของคอลัมน์ราคาสินค้า
+ตรงตามที่บทเรียนแนะนำ: Gemini เลือกใช้ RealColumn get price => real()(); ซึ่งแปลงเป็นชนิดข้อมูล double ใน Dart และ REAL ใน SQLite สำหรับเก็บตัวเลขทศนิยม จึงตรงกับคำแนะนำในบทเรียน ไม่จำเป็นต้องแก้ไขชนิดข้อมูล
+3. การเก็บสำเนาข้อมูลในตาราง Favorites และหลักการ Offline-first (หัวข้อ 8.6)
+แนวทางที่ Gemini เลือก: Gemini แนะนำให้ เก็บสำเนาข้อมูล (ชื่อ, ราคา, รูปภาพ) ลงในตาราง Favorites โดยตรง ไม่ได้เก็บเพียงแค่ itemId
+คำอธิบายตามหลักการ Offline-first (หัวข้อ 8.6):
+การเลือกเก็บสำเนาข้อมูลไว้ในเครื่องถือเป็นแนวทางที่ถูกต้องตามหลัก Offline-first เพราะหากระบบบันทึกเฉพาะ itemId แล้วอาศัยการยิง API ไปดึงรายละเอียดสินค้าใหม่ทุกครั้ง เวลาที่ผู้ใช้เปิดแอปขณะไม่มีอินเทอร์เน็ต (เช่น อยู่ในจุดอับสัญญาณหรือเน็ตหมด) หน้า Favorites จะไม่สามารถแสดงผลชื่อหรือราคาของสินค้าได้เลย
+สถาปัตยกรรมแบบ Offline-first มุ่งเน้นให้ฐานข้อมูลภายในเครื่อง (Local Database) ทำหน้าที่เป็น Single Source of Truth สำหรับหน้าจอแสดงผล เพื่อให้แอปทำงานได้ทันที ไม่กระตุก และแสดงข้อมูลสำคัญได้ครบถ้วนแม้ไม่ได้เชื่อมต่อเครือข่าย
+4. การป้องกันการบันทึกสินค้าซ้ำ (.unique())
+การตรวจสอบ: ในรอบก่อนหน้า Gemini ป้องกันข้อมูลซ้ำโดยการบังคับให้ productId เป็น Primary Key แต่เมื่อเราปรับโครงสร้างตามบทเรียนข้อ 1 (เปลี่ยนให้ตารางใช้ id แบบ Auto-increment เป็น Primary Key) คอลัมน์อ้างอิงสินค้าจะกลายเป็นคอลัมน์ธรรมดา ซึ่ง Gemini ยังไม่ได้กำหนด .unique() ไว้ที่ตัวแปรคอลัมน์
+การแก้ไข: ต้องใส่คำสั่ง .unique() ให้กับคอลัมน์อ้างอิงสินค้า เพื่อบังคับระดับ SQLite ไม่ให้มีสินค้า ID เดิมถูกบันทึกซ้ำซ้อนเมื่อผู้ใช้กดย้ำ
+โค้ดที่ปรับปรุงแก้ไขให้ถูกต้องสมบูรณ์ตามบทเรียน
+code
+Dart
+import 'package:drift/drift.dart';
+
+// 1. ตารางสินค้าที่ถูกใจ (ปรับปรุงตามหลักเกณฑ์ในบทเรียน 8.3 และ 8.6)
+class FavoriteItems extends Table {
+  // Primary Key ประจำตารางตามมาตรฐานบทเรียน (Auto-increment)
+  IntColumn get id => integer().autoIncrement()();
+
+  // อ้างอิงรหัสสินค้า พร้อมบังคับห้ามซ้ำด้วย .unique()
+  IntColumn get itemId => integer().unique()();
+
+  // แคชข้อมูลไว้แสดงผลแบบ Offline-first
+  TextColumn get title => text()();
+  RealColumn get price => real()(); // RealColumn (double) ตรงตามบทเรียน
+  TextColumn get imageUrl => text().nullable()();
+
+  // เวลาที่กดถูกใจเพื่อใช้จัดเรียงข้อมูล
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+}
+
+// 2. ตารางร่างประกาศขายจาก AI
+class DraftListings extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get title => text().nullable()();
+  TextColumn get category => text().nullable()();
+  TextColumn get description => text().nullable()();
+  TextColumn get imagePath => text()();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
 ```
 
 ---
@@ -170,7 +290,7 @@ dart run build_runner build --delete-conflicting-outputs
 > ✅ **Checkpoint 3.1**
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
-
+![alt text](image.png)
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
@@ -297,7 +417,12 @@ items: const [
 > ⚠️ `IndexedStack` อ้างอิง index ตามตำแหน่งใน List `pages` และ `BottomNavigationBarItem` ต้องมีจำนวนเท่ากับ `pages` เสมอ (ตอนนี้ต้องเป็น 3 ทั้งคู่) ถ้าจำนวนไม่ตรงกันแอปจะ Error ทันทีตอนรัน ไม่ใช่แค่แสดงผลผิด
 
 > ✅ **Checkpoint 4.1** รันแอปแล้วทดสอบ: (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home (ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น พร้อมทดสอบกดลบ (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
-
+![alt text](image-1.png)
+![alt text](image-2.png)
+![alt text](image-3.png)
+![alt text](image-4.png)
+![alt text](image-5.png)
+![alt text](image-6.png)
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
@@ -347,10 +472,12 @@ class SellItemPage extends StatefulWidget {
 **ทำไมหน้านี้ไม่ใช่ Tab ที่ 4**: ตาม `campus_marketplace_lab_roadmap.md` หัวข้อ 2.1 มีกฎชัดเจนว่าอะไรควรเป็น Tab (ปลายทางหลักที่สลับไปมาตลอดเวลา) กับอะไรควรเป็น Push/Pop (Flow เฉพาะกิจที่มีจุดเริ่ม-จบ) "ร่างประกาศของฉัน" เป็นหน้าจัดการร่างที่ผูกกับ Flow การลงประกาศโดยตรง ไม่ใช่ปลายทางหลักที่ผู้ใช้เปิดดูตลอดเวลาเหมือน Favorites อีกทั้ง Roadmap ได้กำหนดไว้แล้วว่า Tab ที่ 4 ของแอปคือ "โปรไฟล์" ในสัปดาห์หน้า การเพิ่ม Tab ใหม่อีกตัวตอนนี้จะทำให้ลำดับ Tab ทั้งเทอมเพี้ยนไปจากแผน **จึงให้เข้าถึงหน้านี้ด้วยปุ่มไอคอนใน AppBar ของ Tab "ลงประกาศขาย" แทน** (เช่น `IconButton(icon: Icon(Icons.history), onPressed: () => Navigator.push(...))`) เพิ่ม `AppBar` ให้ `SellItemPage` ถ้ายังไม่มี แล้วใส่ปุ่มนี้ไว้ที่ `actions`
 
 > ✅ **Checkpoint 5.1** รันแอปแล้วทำตามลำดับนี้: 1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7 2. กดยืนยันร่าง 3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง 4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว 
+![alt text](image-7.png)
+![alt text](image-8.png)
+![alt text](image-9.png)
+![alt text](image-10.png)
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+
 
 ---
 
@@ -361,7 +488,8 @@ class SellItemPage extends StatefulWidget {
 ปิด Wi-Fi และ Data บนอุปกรณ์ทดสอบ แล้วเปิดแอป `campus_marketplace_w7` เข้าไปที่ Tab "รายการโปรด" และหน้า "ร่างประกาศของฉัน"
 
 > ✅ **Checkpoint 6.1** ถ่ายภาพหน้าจอที่แสดงให้เห็นว่า Tab รายการโปรดและหน้าร่างประกาศยังคงแสดงข้อมูลได้ตามปกติแม้ไม่มีอินเทอร์เน็ตเลย (ส่วน Tab หน้าหลักที่ดึงจาก Fake Store API คาดว่าจะแสดง Error ตามปกติ เพราะยังไม่ได้ทำ Local Cache ให้หน้านั้น) 
-
+![alt text](image-11.png)
+![alt text](image-12.png)
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
