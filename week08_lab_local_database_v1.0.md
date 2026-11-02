@@ -56,7 +56,45 @@
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+import 'package:drift/drift.dart';
+
+// ---------------------------------------------------------------------------
+// 1. ตารางเก็บสินค้าที่ถูกใจ (FavoriteProducts)
+// ---------------------------------------------------------------------------
+class FavoriteProducts extends Table {
+  // รหัสสินค้าจากระบบหลัก (API) ใช้เป็น Primary Key เพื่อป้องกันการกดถูกใจซ้ำ
+  IntColumn get productId => integer()();
+
+  // แคชข้อมูลพื้นฐานเพื่อแสดงผลแบบ Offline หรือไม่ต้องเรียก API ซ้ำ
+  TextColumn get name => text().withLength(min: 1, max: 255)();
+  RealColumn get price => real()();
+  TextColumn get imageUrl => text()();
+
+  // เวลาที่กดถูกใจ กำหนด default เป็นเวลาปัจจุบัน เอาไว้ใช้เรียงลำดับ (Order By)
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+// ---------------------------------------------------------------------------
+// 2. ตารางเก็บร่างประกาศขายสินค้าจาก AI (DraftListings)
+// ---------------------------------------------------------------------------
+class DraftListings extends Table {
+  // ไอดีของร่างประกาศในเครื่อง (Auto Increment)
+  IntColumn get id => integer().autoIncrement()();
+
+  // ข้อมูลที่ AI ช่วยสร้าง อาจจะยังไม่ครบถ้วนในตอนแรก จึงอนุญาตให้เป็น Nullable ได้
+  TextColumn get title => text().nullable().withLength(max: 150)();
+  TextColumn get category => text().nullable()();
+  TextColumn get description => text().nullable()();
+
+  // Path รูปภาพในเครื่อง (เช่น path จาก ImagePicker หรือ cache directory)
+  TextColumn get localImagePath => text()();
+
+  // บันทึกเวลาที่แก้ไขล่าสุด
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
 ```
 
 
@@ -72,8 +110,17 @@
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+- ตาราง DraftListings กำหนด Primary Key ถูกต้องตามบทเรียน ใช้ id เป็น integer().autoIncrement() แต่ในตาราง FavoriteProducts
+ทาง Gemini เลือกใช้ productId เป็น Primary Key โดยตรง ควรใช้ id แบบ Auto-increment เป็น Key หลัก
+
+- Gemini เลือกใช้ตรงกับที่บทเรียนแนะนำ โดยใช้ชนิดข้อมูล RealColumn real() สำหรับคอลัมน์ราคา ซึ่งจะแปลงเป็นข้อมูลประเภท double
+ในภาษา Dart ทำให้สามารถเก็บค่าทศนิยมของราคาสินค้าได้อย่างถูกต้อง
+
+- Gemini แนะนำให้เก็บสำเนาข้อมูลพื้นฐาน เช่น name, price, imageUrl ไว้ในตาราง Favorites ด้วย ซึ่งถือว่าถูกต้องและเหมาะสมที่สุดตามหลักการ Offline-first 
+
+- ในโค้ดที่ Gemini ตอบกลับมาไม่ได้ใช้คำสั่ง .unique() แต่ใช้การตั้งค่าให้ productId เป็น Primary Key แทน ซึ่งให้ผลลัพธ์ในลักษณะเดียวกันคือป้องกันการซ้ำกันได้
 ```
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/dc29fb2f-1655-4950-afa6-828755230292" />
 
 ---
 
@@ -171,9 +218,13 @@ dart run build_runner build --delete-conflicting-outputs
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
 
-```text
 บันทึกผลลัพธ์ที่นี่
-```
+
+- หน้าจอผลลัพธ์คำสั่ง dart run build_runner build จากขั้นตอนที่ 3.2
+<img width="1920" height="1020" alt="image" src="https://github.com/user-attachments/assets/73cb0016-82e5-4a48-b64b-f229bdd92eea" />
+
+- เปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3
+<img width="1920" height="1020" alt="image" src="https://github.com/user-attachments/assets/c202011f-ca1b-4413-8580-2374ff4b8ccb" />
 
 ---
 
