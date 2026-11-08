@@ -56,7 +56,51 @@
 บันทึกโค้ดที่ Gemini ตอบกลับมาที่ด้านล่าง
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+import 'package:drift/drift.dart';
+
+/// ตารางเก็บสินค้าที่ผู้ใช้กดถูกใจ
+class FavoriteProducts extends Table {
+  // ใช้รหัสสินค้าจาก API เป็น Primary Key
+  IntColumn get productId => integer()();
+
+  // ชื่อสินค้า
+  TextColumn get name => text()();
+
+  // ราคาสินค้า เก็บเป็นจำนวนเต็มหน่วยสตางค์
+  IntColumn get price => integer()();
+
+  // URL ของรูปภาพสินค้า
+  TextColumn get imageUrl => text()();
+
+  // วันที่และเวลาที่ผู้ใช้กดถูกใจ
+  DateTimeColumn get likedAt =>
+      dateTime().clientDefault(() => DateTime.now())();
+
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+/// ตารางเก็บร่างประกาศขายสินค้าที่ AI ช่วยสร้าง
+class ListingDrafts extends Table {
+  // รหัสร่างประกาศ เพิ่มค่าอัตโนมัติ
+  IntColumn get id => integer().autoIncrement()();
+
+  // ชื่อประกาศ
+  TextColumn get title => text().nullable()();
+
+  // หมวดหมู่สินค้า
+  TextColumn get category => text().nullable()();
+
+  // คำบรรยายสินค้า
+  TextColumn get description => text().nullable()();
+
+  // ตำแหน่งไฟล์รูปภาพในเครื่อง
+  TextColumn get imagePath => text()();
+
+  // วันที่และเวลาที่แก้ไขล่าสุด
+  DateTimeColumn get updatedAt =>
+      dateTime().clientDefault(() => DateTime.now())();
+}
 ```
 
 
@@ -72,7 +116,15 @@
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+1. Gemini กำหนด Primary Key ของตาราง FavoriteProducts เป็น productId ซึ่งอ้างอิงจากรหัสสินค้าจริง และกำหนด Primary Key ของตาราง ListingDrafts เป็น id แบบ Auto-increment Integer
+
+เมื่อเปรียบเทียบกับหลักการในบทเรียน พบว่าตาราง ListingDrafts ใช้ Auto-increment Integer ได้ถูกต้อง ส่วน FavoriteProducts ควรปรับให้มี id เป็น Auto-increment Integer เช่นกัน และกำหนด productId เป็นคอลัมน์ที่ห้ามซ้ำแทน เพื่อให้โครงสร้างทั้งสองตารางเป็นไปตามแนวทางที่เรียน
+
+2. Gemini เลือกใช้ IntColumn สำหรับเก็บราคาสินค้า โดยให้เก็บราคาในหน่วยสตางค์ ซึ่งไม่ตรงกับหลักการในบทเรียนที่แนะนำให้ใช้ RealColumn หรือ double สำหรับเก็บข้อมูลที่มีค่าทศนิยม ดังนั้นควรแก้ไขเป็น RealColumn เพื่อให้สามารถจัดเก็บราคาสินค้าที่มีจุดทศนิยมได้ เช่น 99.50 บาท
+
+3. Gemini เสนอให้เก็บสำเนาข้อมูลสินค้า ได้แก่ ชื่อ ราคา และ URL รูปภาพ ไว้ในตาราง FavoriteProducts ด้วย ซึ่งเป็นแนวทางที่เหมาะสม เพราะผู้ใช้สามารถดูข้อมูลสินค้าที่กดถูกใจไว้ได้ แม้ไม่มีอินเทอร์เน็ต หากเก็บเพียง productId แล้วต้องเรียก API เพื่อดึงข้อมูลใหม่ทุกครั้ง ผู้ใช้อาจไม่สามารถดูรายละเอียดสินค้าได้เมื่อออฟไลน์ ดังนั้นการเก็บข้อมูลสำเนาที่จำเป็นไว้ในเครื่องจึงสอดคล้องกับหลักการ Offline-first
+
+4. Gemini ยังไม่ได้กำหนด .unique() ให้กับคอลัมน์ที่อ้างอิงสินค้า เนื่องจากใช้ productId เป็น Primary Key โดยตรง ซึ่งทำให้ไม่สามารถมีค่าซ้ำได้อยู่แล้ว อย่างไรก็ตาม หากปรับโครงสร้างให้ id เป็น Auto-increment Integer จะต้องเพิ่ม .unique() ให้กับ productId เพื่อป้องกันไม่ให้สินค้าชิ้นเดียวกันถูกบันทึกในตาราง Favorites ซ้ำหลายรายการ
 ```
 
 ---
