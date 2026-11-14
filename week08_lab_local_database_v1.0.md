@@ -59,6 +59,53 @@
 บันทึกผลลัพธ์ที่นี่
 ```
 
+```text
+import 'package:drift/drift.dart';
+
+// 1. ตารางเก็บรายการสินค้าที่ถูกใจ (Favorites / Liked Products)
+class FavoriteProducts extends Table {
+  // รหัสสินค้า อ้างอิงจากระบบหลัก
+  IntColumn get productId => integer()();
+
+  // ชื่อสินค้า
+  TextColumn get title => text().withLength(min: 1, max: 255)();
+
+  // ราคา (รองรับทศนิยม)
+  RealColumn get price => real()();
+
+  // URL หรือ path ของรูปภาพสินค้า
+  TextColumn get imageUrl => text()();
+
+  // เวลาที่กดถูกใจ (ค่าเริ่มต้นเป็นเวลาปัจจุบัน)
+  DateTimeColumn get likedAt => dateTime().withDefault(currentDateAndTime)();
+
+  // กำหนดให้ productId เป็น Primary Key เพื่อป้องกันการกดถูกใจซ้ำ
+  @override
+  Set<Column> get primaryKey => {productId};
+}
+
+// 2. ตารางเก็บร่างประกาศขายสินค้าที่ AI ช่วยแนะนำ (Listing Drafts)
+class ListingDrafts extends Table {
+  // Primary key แบบ Auto increment สำหรับระบุ Draft แต่ละชิ้น
+  IntColumn get id => integer().autoIncrement()();
+
+  // path ของรูปภาพในเครื่อง (ใช้เป็นภาพตั้งต้นที่ส่งให้ AI วิเคราะห์)
+  TextColumn get imagePath => text()();
+
+  // ชื่อประกาศ (nullable เผื่อ AI วิเคราะห์ไม่ได้ หรือผู้ใช้ลบออก)
+  TextColumn get title => text().nullable()();
+
+  // หมวดหมู่สินค้า
+  TextColumn get category => text().nullable()();
+
+  // คำบรรยายสินค้า
+  TextColumn get description => text().nullable()();
+
+  // เวลาที่แก้ไขล่าสุด (ค่าเริ่มต้นเป็นเวลาปัจจุบัน)
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+}
+```
+
 
 ### ขั้นตอนที่ 1.2: ตรวจสอบและเทียบกับหลักการในบทเรียน 🧠 คิดเอง
 
@@ -72,7 +119,19 @@
 > ✅ **Checkpoint 1.1** บันทึกคำตอบจากคำถามด้านบนทั้ง 4 ข้อ พร้อมแนบภาพหน้าจอผลลัพธ์จาก Gemini
 
 ```text
-บันทึกผลลัพธ์ที่นี่
+บันทึกผล
+
+1.1 Gemini กำหนด Primary Key ให้แต่ละตารางถูกต้องหรือไม่ (ควรเป็น Auto-increment Integer ตามที่อธิบายในบทเรียน)
+ตอบ ไม่ถูกต้องทั้งหมด เพราะตาราง FavoriteProducts ใช้ productId เป็น Primary Key แทนการสร้าง id แบบ Auto-increment Integer ตามบทเรียน ส่วนตาราง ListingDrafts กำหนดถูกต้องแล้ว จึงควรเพิ่ม id แบบ Auto-increment ให้ตาราง FavoriteProducts ด้วย
+
+1.2 คอลัมน์ราคาสินค้า Gemini เลือกชนิดข้อมูลใด ตรงกับที่บทเรียนแนะนำ (`RealColumn`/`double`) หรือไม่ หากไม่ตรง ให้แก้ไขเอง
+ตอบ ตรงกับที่บทเรียนแนะนำ เพราะ Gemini ใช้ RealColumn หรือ real() ซึ่งรองรับตัวเลขทศนิยม (double) เหมาะสำหรับเก็บราคาสินค้าและตรงตามบทเรียน 
+
+1.3 Gemini เสนอให้เก็บสำเนาข้อมูล (เช่น ชื่อ/ราคาสินค้า) ซ้ำไว้ในตาราง Favorites หรือแนะนำให้เก็บแค่ `itemId` แล้วไปเรียก API ใหม่ทุกครั้ง หากแนะนำแบบหลัง ให้อธิบายตามหลักการ Offline-first ในบทหนังสือเรียนหัวข้อ 8.6 ว่าทำไมแนวทางนั้นไม่เหมาะกับสถานการณ์ที่ไม่มีอินเทอร์เน็ต
+ตอบ Gemini เลือกเก็บสำเนาข้อมูล เช่น ชื่อสินค้า ราคา และรูปภาพไว้ในตาราง FavoriteProducts ซึ่งตรงกับหลัก Offline-first เพราะสามารถแสดงข้อมูลสินค้าที่ถูกใจได้แม้ไม่มีอินเทอร์เน็ต โดยไม่ต้องเรียก API ใหม่ทุกครั้ง
+
+1.4 Gemini กำหนดให้คอลัมน์ที่อ้างอิงสินค้า (`itemId`) ห้ามมีค่าซ้ำกัน (`.unique()`) หรือไม่ ถ้าไม่ได้กำหนด ให้เพิ่มเอง เพราะถ้าไม่มีข้อบังคับนี้ ผู้ใช้กดหัวใจสินค้าชิ้นเดียวกันซ้ำได้ไม่จำกัด ทำให้ตาราง Favorites มีแถวซ้ำกันสะสมไปเรื่อย ๆ
+ตอบ Gemini ไม่ได้กำหนด .unique() โดยตรง แต่ใช้ productId เป็น Primary Key ซึ่งป้องกันข้อมูลซ้ำได้เช่นกัน อย่างไรก็ตาม เมื่อเปลี่ยนมาใช้ id เป็น Primary Key แล้ว ต้องเพิ่ม .unique() ให้ productId โดยแก้เป็น
 ```
 
 ---
@@ -171,9 +230,8 @@ dart run build_runner build --delete-conflicting-outputs
 
 capture หน้าจอผลลัพธ์คำสั่ง `dart run build_runner build` จากขั้นตอนที่ 3.2 ที่แสดงว่าสร้างไฟล์สำเร็จ (ไม่มี Error เรื่อง Class ชื่อซ้ำ) จากนั้นเปิดไฟล์ main.dart ที่แก้ตามขั้นตอนที่ 3.3 โดย ยังไม่ต้องรันแอปในจุดนี้ เพราะ VS Code จะขีดเส้นสีแดงใต้ FavoritesRepositoryDrift และ ListingDraftRepositoryDrift (ยังไม่มี Class จริง จะเขียน Class นี้ในส่วนที่ 4-5) และถ้าสั่งรันตอนนี้แอปจะ Error ทันทีเพราะคอมไพล์ไม่ผ่าน ถือเป็นเรื่องปกติ — จะกลับมารันแอปได้จริงอีกครั้งหลังทำ Checkpoint 4.1 และ 5.1 เสร็จ
 
-```text
-บันทึกผลลัพธ์ที่นี่
-```
+![](https://github.com/user-attachments/assets/6f8ef94f-5631-4561-92cb-119666efe10c)
+
 
 ---
 
@@ -302,6 +360,33 @@ items: const [
 บันทึกผลลัพธ์ที่นี่
 ```
 
+1. (ก) กดหัวใจที่สินค้า 3 ชิ้นจากหน้า Home
+(ข) สลับไป Tab "รายการโปรด" เห็นครบทั้ง 3 ชิ้น
+
+![](https://github.com/user-attachments/assets/9d415b8f-dd25-4e65-8a39-a77f831ce0a9)
+
+2. (ค) ปิดแอปให้สนิท (Force Stop หรือปัดออกจาก Recent Apps) แล้วเปิดใหม่ กลับไปที่ Tab รายการโปรดอีกครั้ง ถ่ายภาพหน้าจอ (ข) และ (ค) เทียบกัน ต้องแสดงรายการเดิมครบทุกชิ้น
+
+- รูปก่อนปิดแอป (ข)
+![](https://github.com/user-attachments/assets/9d415b8f-dd25-4e65-8a39-a77f831ce0a9)
+
+- รูปหลังปิดแอป แล้วเปิดใหม่ (ค) แสดงรายการเดิมครบทุกชิ้น
+![](https://github.com/user-attachments/assets/5d275e07-c614-49f8-9551-4c0c6d3deaea)
+
+3. (Remove) 1 ชิ้น แล้วปิดเปิดแอปใหม่อีกครั้งเพื่อยืนยันว่าการลบก็ถูกบันทึกถาวรเช่นกัน
+
+- รูปกดลบรายการโปรด ก่อนปิดแอป
+![](https://github.com/user-attachments/assets/52aee89c-80c2-4f32-b542-8de908f48d1a)
+
+- รูปกดลบรายการเปิด ตอนเปิดแอปขึ้นมาใหม่
+![](https://github.com/user-attachments/assets/18482c1a-3b45-4f7d-b2d5-93265bae86c8)
+
+4. (ง) กลับไปหน้า Home แล้วกดหัวใจซ้ำที่สินค้าชิ้นเดิมอีกครั้ง (ชิ้นที่ยังไม่ได้ลบ) แล้วตรวจสอบที่ Tab รายการโปรดว่ายังแสดงสินค้าชิ้นนั้นแค่แถวเดียว ไม่ซ้ำเป็น 2 แถว และแอปไม่ Error
+
+- สินค้าไม่ขึ้นซ้ำ และไม่เกิด Error
+![](https://github.com/user-attachments/assets/6c3c6774-03ad-4ead-b479-01a7cfacea7a)
+![](https://github.com/user-attachments/assets/8c314a3a-e337-4374-8aeb-e18dba93faf3)
+
 ---
 
 ## ส่วนที่ 5: นำร่างประกาศขายสินค้า (สัปดาห์ที่ 7) มาบันทึกถาวร
@@ -351,6 +436,23 @@ class SellItemPage extends StatefulWidget {
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+1. สร้างร่างประกาศใหม่ผ่าน Tab "ลงประกาศขาย" ด้วยความช่วยเหลือของ AI เหมือนสัปดาห์ที่ 7
+
+![](https://github.com/user-attachments/assets/cb72e959-f342-4462-b9be-ad6eb4e5bfe4)
+
+2. กดยืนยันร่าง
+
+![](https://github.com/user-attachments/assets/9465e64b-ee31-4b46-955c-ebf6099a9af3)
+
+3. กดปุ่มไอคอนเข้าหน้า "ร่างประกาศของฉัน" แล้วเห็นร่างที่เพิ่งสร้าง
+
+![](https://github.com/user-attachments/assets/17e9918e-89ee-4e73-86b0-3e0a801ced63)
+
+4. ปิดแอปให้สนิทแล้วเปิดใหม่ กลับเข้าหน้า "ร่างประกาศของฉัน" อีกครั้ง ถ่ายภาพหน้าจอทั้ง 4 ขั้นตอนนี้แนบส่ง เพื่อพิสูจน์ว่าร่างไม่หายไปแม้ปิดแอปแล้ว 
+- ไม่หาย
+![](https://github.com/user-attachments/assets/fbbcd83b-b1c2-4ec3-adfd-ad38640412f4)
+
+
 
 ---
 
@@ -365,6 +467,13 @@ class SellItemPage extends StatefulWidget {
 ```text
 บันทึกผลลัพธ์ที่นี่
 ```
+Tab รายการโปรดและหน้าร่างประกาศยังคงแสดงข้อมูลได้ตามปกติแม้ไม่มีอินเทอร์เน็ตเลย
+![](https://github.com/user-attachments/assets/90aa3ef1-2c1f-4f55-8c81-2d7524c78f2d)
+![](https://github.com/user-attachments/assets/f7471c4f-6d54-4d9e-a28b-287f4e11cffb)
+![](https://github.com/user-attachments/assets/33f3d361-628b-45d6-8c21-de816ad541e5)
+
+
+
 
 ---
 
